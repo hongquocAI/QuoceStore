@@ -1,0 +1,52 @@
+{
+  "title": "Pin sạc dự phòng Baseus EnerFill FC51 Bipow2 Pro Built-in Cable Digital Display 10000mAh 22.5W",
+  "slug": "baseus-fc51",
+  "description": "Baseus EnerFill FC51 Bipow2 Pro 10000mAh là giải pháp sạc di động hướng đến sự tiện lợi và hiệu quả trong quá trình sử dụng hàng ngày. Sở hữu dung lượng phổ thông 10000mAh, hỗ trợ sạc nhanh 22.5W cùng thiết kế tích hợp cáp sạc và màn hình hiển thị kỹ thuật số.",
+  "price": 429000,
+  "originalPrice": 690000,
+  "stock": 100,
+  "categoryId": "cat_pin_du_phong",
+  "isActive": true,
+  "thumbnail": "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123000/quoce-products/rhws4f5qpnf2kriwmqyl.jpg",
+  "colors": [
+    {
+      "name": "Đen",
+      "code": "#000000",
+      "thumbnail": "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123000/quoce-products/rhws4f5qpnf2kriwmqyl.jpg",
+      "images": [
+        "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123000/quoce-products/rhws4f5qpnf2kriwmqyl.jpg",
+        "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123001/quoce-products/xg4ppa66zijm27qcbvww.jpg",
+        "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123002/quoce-products/cpvmrfnjzhzpmlhgfplc.jpg",
+        "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123002/quoce-products/sbgmnpnly7qe43o8mwrc.jpg"
+      ]
+    },
+    {
+      "name": "Trắng",
+      "code": "#FFFFFF",
+      "thumbnail": "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123003/quoce-products/c879wnaxdjkewxtshkbt.jpg",
+      "images": [
+        "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123003/quoce-products/c879wnaxdjkewxtshkbt.jpg",
+        "https://res.cloudinary.com/xrihnkhg/image/upload/v1787123004/quoce-products/lz9wqa8dhjlzeerhzzu9.jpg"
+      ]
+    }
+  ],
+  "highlights": [
+    "Dung lượng 10000mAh cho phép sạc nhiều lần cho smartphone, lý tưởng cho sử dụng hàng ngày.",
+    "Hỗ trợ sạc nhanh công suất đầu ra lên đến 22.5W (PD 22.5W, hỗ trợ sạc 3 thiết bị).",
+    "Tích hợp sẵn cáp USB-C mang lại sự tiện lợi tối đa và gọn gàng khi mang theo.",
+    "Màn hình LED kỹ thuật số giúp theo dõi chính xác phần trăm pin theo thời gian thực.",
+    "Bảo vệ an toàn toàn diện: chống quá nhiệt, quá tải và ngắn mạch."
+  ],
+  "specs": {
+    "brand": "Baseus",
+    "warranty": "12 tháng",
+    "model": "EnerFill FC51 Bipow2 Pro Built-in Cable Digital Display 10000mAh 22.5W",
+    "capacity": "10.000mAh",
+    "fastCharging": "PD 22.5W",
+    "portsCount": "2 cổng",
+    "inputVoltage": "USB-C: 5V/3A, 9V/2A",
+    "outputVoltage": "Cáp USB-C tích hợp: 5V/3A, 9V/2.22A, 12V/1.67A (Tối đa 22.5W) - USB-C: 5V/3A, 9V/2A, 12V/1.5A - USB-A: 5V/3A, 9V/2A, 12V/1.5A",
+    "dimensions": "124.7 x 71.2 x 43.1 mm",
+    "weight": "204g"
+  }
+}

@@ -1,0 +1,38 @@
+@baseUrl = http://localhost:5000
+
+### 1. Lấy danh sách danh mục (Để lấy categoryId)
+GET {{baseUrl}}/products/categories
+
+### 2. Upload ảnh sản phẩm
+# Thay thế "test.jpg" bằng ảnh thật trong thư mục của bạn
+POST {{baseUrl}}/products/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="files"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./test.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### 3. Tạo sản phẩm mới
+# Sau khi chạy request 2, copy URL ảnh trả về dán vào mảng "images" dưới đây
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "title": "Pin Dự Phòng Baseus Siêu Nhanh",
+  "slug": "baseus-pin-du-phong-001",
+  "description": "Sạc dự phòng 20000mAh, công suất 65W, bảo hành 12 tháng.",
+  "price": 890000,
+  "originalPrice": 1200000,
+  "stock": 100,
+  "categoryId": "cat_pin_du_phong",
+  "isActive": true,
+  "images": ["https://res.cloudinary.com/xrihnkhg/image/upload/..."],
+  "highlights": ["Sạc nhanh 65W", "Màn hình LED", "Nhỏ gọn"],
+  "specs": {
+    "dung_luong": "20000mAh",
+    "cong_suat": "65W"
+  }
+}

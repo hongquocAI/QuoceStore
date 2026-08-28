@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  VENDOR
+  CUSTOMER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+  FAILED
+}
+
+enum ShippingStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// ⚡ MỚI: enum thay cho gender: String? tự do trước đây — DB giờ ép buộc
+// đúng 1 trong 3 giá trị, không còn chấp nhận string bất kỳ.
+enum Gender {
+  NAM
+  NU
+  KHAC
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  fullName      String
+  phone         String?
+  address       String?
+  cccd          String?
+  gender        Gender?
+  dateOfBirth   DateTime? @db.Date
+  avatarUrl     String?
+  loyaltyPoints Int       @default(0)
+
+  role          Role      @default(CUSTOMER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  orders        Order[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  deviceIp  String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Category {
+  id            String        @id @default(uuid())
+  name          String
+  slug          String        @unique
+  description   String?
+  products      Product[]
+  subCategories SubCategory[] // ⚡ MỚI
+
+  @@map("categories")
+}
+
+// ⚡ MỚI: bảng quan hệ thật, thay cho Product.subCategorySlug (string tự do).
+// Mỗi SubCategory thuộc về đúng 1 Category cha (VD: "Cáp sạc" thuộc "Phụ kiện").
+model SubCategory {
+  id         String    @id @default(uuid())
+  name       String
+  slug       String    @unique
+  categoryId String
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  products   Product[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([categoryId])
+  @@map("sub_categories")
+}
+
+// ⚡ MỚI: bảng quan hệ thật, thay cho Product.brandSlug/brandName (string tự do).
+model Brand {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String    @unique
+  logoUrl   String?
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("brands")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  title         String
+  slug          String   @unique
+  sku           String?  @unique
+  description   String
+  price         Decimal  @db.Decimal(10, 2)
+  originalPrice Decimal? @db.Decimal(10, 2)
+  stock         Int      @default(0)
+
+  thumbnail     String?
+  images        String[]
+
+  highlights    String[] @default([])
+  specs         Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // 🛡️ FIX QUAN TRỌNG NHẤT của Phase 1: ĐÃ XÓA categorySlug/subCategorySlug/
+  // brandSlug/brandName (string tự do, không ràng buộc toàn vẹn dữ liệu).
+  // Thay bằng 3 Foreign Key thật — Postgres giờ TỰ ĐỘNG từ chối bất kỳ giá
+  // trị categoryId/subCategoryId/brandId nào không tồn tại thật trong DB,
+  // loại bỏ hoàn toàn khả năng dữ liệu phân mảnh do gõ nhầm slug.
+  categoryId    String
+  subCategoryId String
+  brandId       String
+
+  category      Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategory   SubCategory      @relation(fields: [subCategoryId], references: [id], onDelete: Restrict)
+  brand         Brand            @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  variants      ProductVariant[]
+  orderItems    OrderItem[]
+
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@index([brandId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id        String   @id @default(uuid())
+  productId String
+  colorCode String
+  colorName String
+  hexCode   String?
+  price     Decimal? @db.Decimal(10, 2)
+  stock     Int      @default(0)
+  images    String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model Order {
+  id             String         @id @default(uuid())
+  orderCode      Int            @unique @default(autoincrement())
+  userId         String
+
+  customerName   String
+  customerPhone  String
+  customerEmail  String?
+  address        String
+  paymentMethod  String         @default("COD")
+
+  totalAmount    Decimal        @db.Decimal(12, 2)
+  paymentStatus  PaymentStatus  @default(PENDING)
+  shippingStatus ShippingStatus @default(PENDING)
+  qrCodeUrl      String?
+  paymentLink    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  orderItems          OrderItem[]
+  paymentTransactions PaymentTransaction[]
+
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String  @id @default(uuid())
+  orderId          String
+  productId        String
+  variantId        String?
+  variantColorName String?
+  quantity         Int     @default(1)
+  priceAtPurchase  Decimal @db.Decimal(10, 2)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+model PaymentTransaction {
+  id              String   @id @default(uuid())
+  orderId         String
+  transactionId   String   @unique
+  amount          Decimal  @db.Decimal(12, 2)
+  paymentMethod   String   @default("VIETQR")
+  status          String
+  webhookPayload  Json
+  transactionTime DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("payment_transactions")
+}
+
+model Discount {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  percentage Float
+  isActive   Boolean   @default(true)
+  maxUsage   Int?
+  usedCount  Int       @default(0)
+  expiryDate DateTime?
+
+  @@map("discounts")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("audit_logs")
+}
