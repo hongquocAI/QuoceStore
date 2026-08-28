@@ -39,6 +39,40 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
    định CÓ CHỦ Ý (xem mục "Bài học quan trọng" bên dưới), không phải sai sót.
    TUYỆT ĐỐI KHÔNG tự ý thêm lại 1 Interceptor tự động bọc response toàn cục.
 
+8. **TUYỆT ĐỐI KHÔNG chạy `prisma migrate reset`** khi chưa hỏi và nhận xác
+   nhận rõ ràng từ người dùng trong CHÍNH phiên làm việc đó — lệnh này XÓA
+   SẠCH toàn bộ dữ liệu trong DB. Dùng `prisma migrate dev --name <mô tả>`
+   cho mọi thay đổi schema thông thường (lệnh này AN TOÀN, tự sinh migration
+   mới, không xóa dữ liệu trừ khi thay đổi cấu trúc buộc phải xóa cột/bảng cụ
+   thể — Prisma sẽ tự cảnh báo và hỏi xác nhận trong trường hợp đó).
+
+9. **Dọn sạch mọi code/dữ liệu tạm dùng để test TRƯỚC KHI báo hoàn thành**,
+   không đợi người dùng phát hiện và nhắc. Bao gồm: dòng `console.log` debug
+   tạm, `throw new Error('TEST...')` cố tình gây lỗi để kiểm tra, bản ghi test
+   tạo trong DB (VD sản phẩm/đơn hàng test qua Postman/curl), file tạm. Trước
+   khi ghi log "Đã hoàn thành" vào PROGRESS.md, tự hỏi: "Có gì tôi tạo ra chỉ
+   để test mà chưa dọn không?"
+
+10. **Nếu phát hiện nội dung trong CLAUDE.md không khớp với code thật hiện
+    tại** (do file này có thể đã lỗi thời so với các thay đổi mới), LUÔN tin
+    tưởng code thật trên đĩa, KHÔNG tin mù quáng vào mô tả trong file. Sau khi
+    xác nhận sai lệch, tự sửa lại đúng phần đó trong CLAUDE.md để các phiên
+    làm việc sau không bị dẫn sai — coi việc giữ CLAUDE.md luôn khớp thực tế
+    là một phần của "hoàn thành công việc", không phải việc phụ.
+
+11. **Khi thực sự bị bí** (thiếu thông tin để quyết định, hoặc đã thử ≥ 2 cách
+    khác nhau cho cùng 1 vấn đề mà vẫn không được), DỪNG LẠI — không đoán mò
+    tiếp, không lặp lại y hệt cách cũ lần thứ 3. Đặt ĐÚNG 1 câu hỏi cụ thể,
+    người dùng có thể trả lời trực tiếp và hành động được ngay (không hỏi
+    kiểu mở "bạn muốn tôi làm gì tiếp" — hỏi kiểu "X hiện đang trả về Y, tôi
+    nghi ngờ nguyên nhân là Z, bạn xác nhận giúp bằng cách chạy lệnh này...").
+
+12. **Trước khi go-live thật (Nhóm E)**, nhắc người dùng rotate lại mọi
+    credential đã từng bị dán ở dạng plaintext ra ngoài file `.env` (trong
+    chat, ảnh chụp màn hình, log, hay bất kỳ kênh nào không phải chính file
+    `.env`) — bao gồm nhưng không giới hạn: mật khẩu Neon Postgres, Cloudinary
+    API Secret, PayOS keys. Đây là rủi ro bảo mật thật, không phải hình thức.
+
 ## STACK & KIẾN TRÚC
 
 - Backend: NestJS 11, Prisma 6.19, PostgreSQL (Neon serverless), TypeScript strict
@@ -53,6 +87,7 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
   payos.webhooks.verify — KHÔNG phải payos.createPaymentLink như v1)
 - Rate limiting: @nestjs/throttler, áp riêng từng endpoint nhạy cảm (login 5/phút,
   register 3/phút, AI chat 10/phút, order lookup 5/phút)
+- Version control: Git + GitHub (https://github.com/hongquoccoder/QuoceStore, private)
 
 ## ĐÃ HOÀN THÀNH — KHÔNG ĐỘNG VÀO TRỪ KHI CÓ BUG THẬT
 
@@ -129,6 +164,20 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
     production sẽ rõ hơn do latency DB cao hơn)
 - ❌ CHƯA LÀM: Phân trang cho GET /products, GET /products/admin/all
 
+### Hạ tầng quản lý mã nguồn (MỚI)
+- Git repo đã khởi tạo tại thư mục gốc D:\Projects\quoce_store (KHÔNG phải
+  trong backend/ hay frontend/ riêng lẻ — 2 thư mục con từng có .git riêng do
+  lệnh khởi tạo project tự động tạo, đã bị xóa để gộp về 1 repo duy nhất)
+- Đã push lên GitHub: https://github.com/hongquoccoder/QuoceStore (private)
+- .gitignore đã xác nhận chặn đúng .env ở cả backend/ và frontend/
+- Đã dọn: xóa file rác frontend/src/app/lib/api.ts (trùng lặp, không được
+  import ở đâu — file thật là frontend/src/lib/api.ts) và
+  frontend/src/components/layout/Navbar.tsx (dead code, dùng cơ chế auth cũ,
+  không được layout.tsx import)
+- File docker-compose.yml (leftover từ giai đoạn đầu dự án, dùng branding
+  "apexstore" cũ, không còn được dùng vì đã chuyển sang Neon + Upstash thật)
+  đã bị xóa
+
 ## VIỆC CẦN LÀM TIẾP — THEO ĐÚNG THỨ TỰ ƯU TIÊN
 
 ### 1. Hoàn tất Nhóm B — Phân trang (làm NGAY, đang dở)
@@ -176,10 +225,11 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
   (DigitalOcean/Linode) hay PaaS (Vercel+Railway/Render)?
 - Tách config Dev/Staging/Production rõ ràng (.env.development,
   .env.production, không commit file .env thật lên Git — xác nhận
-  .gitignore đã đúng)
+  .gitignore đã đúng — ĐÃ XÁC NHẬN AN TOÀN, xem mục "Hạ tầng quản lý mã nguồn")
 - Domain thật + SSL/HTTPS (Let's Encrypt nếu VPS, tự động nếu PaaS)
 - Xác nhận chiến lược backup của Neon Postgres (retention policy)
-- CI/CD cơ bản: ít nhất chạy `tsc --noEmit` + test trước khi deploy
+- CI/CD cơ bản: ít nhất chạy `tsc --noEmit` + test trước khi deploy (có thể
+  dùng GitHub Actions vì repo đã có sẵn trên GitHub)
 
 ## GIAO THỨC LÀM VIỆC BẠN PHẢI TUÂN THỦ
 
@@ -216,21 +266,109 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
    - Lệnh cần chạy để xác nhận trạng thái hiện tại: <VD: npx tsc --noEmit,
      curl endpoint nào để kiểm tra>
    ```
-   Sau đó DỪNG LẠI, không cố làm thêm dở dang gây rối code.
+   Sau đó chạy `git add . && git commit -m "checkpoint: <mô tả ngắn>" && git push`
+   NGAY LẬP TỨC (xem mục GIT WORKFLOW bên dưới), rồi DỪNG LẠI — không cố làm
+   thêm dở dang gây rối code.
 
 5. **Ở đầu MỖI phiên làm việc mới**, đọc `PROGRESS.md` trước tiên (nếu tồn
    tại) để biết chính xác trạng thái, tránh làm lại việc đã xong hoặc bỏ sót
-   việc đang dở.
+   việc đang dở. Đối chiếu thêm với `git log --oneline -10` để xác nhận code
+   thật trên đĩa khớp với những gì log ghi lại.
 
 6. **Không tự ý đưa ra quyết định kiến trúc lớn** (đổi cấu trúc DB, đổi
    pattern auth, thêm dependency lớn mới) mà không dừng lại hỏi người dùng
    xác nhận trước — đặc biệt các mục có ghi "CẦN NGƯỜI DÙNG XÁC NHẬN" ở trên.
+
+## KHI NÀO PHẢI DỪNG LẠI ĐỀ XUẤT ĐỔI MODEL/EFFORT
+
+Bạn (model đang chạy phiên này) KHÔNG TỰ ĐỔI được model của chính mình — việc
+đổi model/effort là thao tác người dùng thực hiện qua lệnh `/model` và
+`/effort` trong CLI. Nhiệm vụ của bạn là NHẬN DIỆN đúng lúc và CHỦ ĐỘNG ĐỀ
+XUẤT cho người dùng, rồi DỪNG LẠI chờ họ xác nhận trước khi tiếp tục — không
+tự làm luôn trên model hiện tại nếu việc đó thực sự cần suy luận sâu hơn.
+
+**Đề xuất chuyển sang `/model opusplan` (hoặc `/model opus` + `/effort high`)
+khi việc sắp làm có ≥ 1 trong các dấu hiệu sau:**
+
+1. Sẽ phải sửa từ 3 file trở lên vì chúng phụ thuộc/liên quan nhau (không
+   phải 3 file độc lập, sửa riêng lẻ được).
+2. Cần tích hợp 1 thư viện/API bên thứ 3 CHƯA từng dùng trong project này
+   trước đó (đúng bài học @payos/node — không được đoán API).
+3. Đây là 1 quyết định có tính đánh đổi thật (trade-off) — không có đáp án
+   "đúng tuyệt đối", cần cân nhắc ưu/nhược trước khi chọn hướng.
+4. Việc này sẽ tạo ra 1 khuôn mẫu (pattern) mà code sau này phải noi theo —
+   sai ở bước này sẽ lan rộng, khó sửa lại.
+5. Đã thử sửa cùng 1 lỗi 2 lần trên model hiện tại mà vẫn sai — đừng thử lại
+   lần 3 với cùng cách tiếp cận, dừng lại đề xuất đổi.
+6. Đây là 1 trong các mục có ghi rõ "CẦN NGƯỜI DÙNG XÁC NHẬN" ở phần "VIỆC CẦN
+   LÀM TIẾP" phía trên.
+
+**Cách đề xuất — mẫu câu**:
+```
+⚠️ Việc sắp làm ("<tên việc>") có dấu hiệu [<liệt kê đúng dấu hiệu nào khớp>]
+— đây là loại quyết định nên dùng model mạnh hơn để phân tích kỹ trước khi
+code. Đề xuất bạn chạy `/model opusplan` (hoặc `/effort high`) trước khi tôi
+tiếp tục. Bạn có muốn đổi không, hay cứ để tôi làm trên model hiện tại?
+```
+Sau đó DỪNG LẠI, chờ người dùng trả lời — không tự tiếp tục ngay.
+
+**Đề xuất quay lại `/model sonnet` (+ effort mặc định) khi**: vừa xong 1 việc
+thuộc nhóm trên, chuẩn bị chuyển sang việc cơ khí/lặp lại (viết CRUD theo
+khuôn mẫu đã có, sửa lỗi TypeScript đơn giản, thêm field vào DTO theo pattern
+sẵn có) — nhắc người dùng đổi lại để tiết kiệm usage, vì gói Pro có hạn mức
+chung giữa Claude Code và claude.ai.
+
+**KHÔNG cần đề xuất đổi model cho**: sửa lỗi cú pháp, thêm validate 1 field,
+viết thêm 1 API CRUD giống hệt cái đã có trong project, chỉnh CSS/text hiển
+thị, các việc đã có "công thức" rõ ràng trong project — cứ làm thẳng trên
+model hiện tại, không cần hỏi.
+
+## GIT WORKFLOW
+
+- Repo đã khởi tạo tại thư mục gốc (D:\Projects\quoce_store), remote là
+  https://github.com/hongquoccoder/QuoceStore (private). KHÔNG init lại git
+  trong backend/ hay frontend/ riêng lẻ — luôn thao tác Git từ thư mục gốc.
+
+- Sau khi hoàn thành MỖI việc trong "VIỆC CẦN LÀM TIẾP" (không phải sau từng
+  file nhỏ lẻ — gộp thành 1 đơn vị công việc hoàn chỉnh mới commit), chạy:
+  ```
+  git add .
+  git status
+  ```
+
+- **BẮT BUỘC đọc kỹ output của `git status` TRƯỚC KHI commit.** Nếu thấy bất
+  kỳ file nào trong số này xuất hiện trong danh sách staged, DỪNG LẠI NGAY,
+  không commit, báo cho người dùng:
+  - `.env` (chỉ được phép có `.env.example`)
+  - Bất kỳ file nào chứa "SECRET", "PASSWORD", "API_KEY" trong tên hoặc có vẻ
+    chứa giá trị thật (không phải placeholder)
+  - `node_modules/`, `.next/`, `dist/` (nếu xuất hiện, .gitignore đang bị lỗi
+    ở đâu đó, cần sửa .gitignore trước, không commit)
+
+- Nếu `git status` sạch, tiếp tục:
+  ```
+  git commit -m "<mô tả ngắn gọn, tiếng Việt hoặc Anh đều được, súc tích>"
+  git push
+  ```
+
+- Push lên remote LÀ BẮT BUỘC (không chỉ commit local) tại các mốc:
+  1. Ngay sau khi hoàn thành xong 1 mục lớn trong roadmap "VIỆC CẦN LÀM TIẾP"
+  2. Ngay trước khi ghi checkpoint "sắp hết usage" vào PROGRESS.md (xem mục 4
+     ở "GIAO THỨC LÀM VIỆC" phía trên) — đây là bước không được bỏ qua, đảm
+     bảo code luôn có bản sao an toàn trên GitHub trước khi phiên bị ngắt.
+
+- KHÔNG bao giờ dùng `git push --force` trừ khi người dùng yêu cầu rõ ràng
+  bằng văn bản trong chính phiên làm việc đó.
+
+- KHÔNG bao giờ chạy `git reset --hard` hoặc xóa lịch sử commit mà không hỏi
+  người dùng xác nhận trước — kể cả khi tin rằng 1 commit trước đó có lỗi.
 
 ## THÔNG TIN MÔI TRƯỜNG (không phải secret, nhưng cần biết để không hỏi lại)
 - Backend: D:\Projects\quoce_store\backend, chạy `npm run start:dev`, port 5000
 - Frontend: D:\Projects\quoce_store\frontend, chạy `npm run dev`, port 3000
 - Database: Neon Postgres (serverless, có thể "ngủ" nếu không hoạt động lâu)
 - Redis: Upstash (miễn phí, region Singapore)
+- Git remote: https://github.com/hongquoccoder/QuoceStore (private repo)
 - OS: Windows, dùng PowerShell (LƯU Ý: `curl` trên Windows là alias của
   Invoke-WebRequest, cần `-UseBasicParsing` để tránh cảnh báo; dùng
   `Measure-Command { ... }` để đo thời gian; `Get-Content <file> | Select-String
