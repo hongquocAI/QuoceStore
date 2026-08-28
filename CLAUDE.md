@@ -152,7 +152,7 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
   Sentry.captureException() CHỈ với lỗi 500 thật (không phải lỗi nghiệp vụ
   400/401/403)
 
-### Nhóm B — Sẵn sàng chịu tải (ĐANG DỞ — 50%)
+### Nhóm B — Sẵn sàng chịu tải (100% XONG)
 - ✅ Redis cache (Upstash, qua @nestjs/cache-manager + @keyv/redis, dùng
   createKeyv(REDIS_URL)) — đã áp dụng cho:
   - BrandsService.findAll() (key: brands:all, TTL 1h)
@@ -162,7 +162,36 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
   - Đã verify: Upstash Data Browser thấy đúng key, TTL, cache hit nhanh hơn
     cache miss rõ rệt (94ms → 82ms, môi trường dev local nên chênh lệch nhỏ,
     production sẽ rõ hơn do latency DB cao hơn)
-- ❌ CHƯA LÀM: Phân trang cho GET /products, GET /products/admin/all
+- ✅ Phân trang cho GET /products và GET /products/admin/all
+  - `QueryProductDto` (src/product/dto/query-product.dto.ts) — DTO query đầu
+    tiên của dự án, là KHUÔN MẪU cho các endpoint danh sách sau này: `page`
+    (default 1), `limit` (default 20, `@Max(100)`), filter `categoryId`/
+    `subCategoryId`/`brandId` (`@IsUUID`) và `search`
+  - Service dùng `$transaction([findMany, count])` để items và total đọc trên
+    cùng 1 ảnh chụp dữ liệu; trả `{ items, total, page, limit, totalPages }`
+    (`totalPages` tối thiểu là 1 kể cả khi rỗng). `search` khớp title HOẶC sku
+  - ❗ Danh sách sản phẩm CỐ Ý KHÔNG cache — mỗi lời gọi mang tổ hợp
+    page/limit/filter khác nhau nên số cache key là vô hạn, và Redis qua Keyv
+    không cho xóa theo prefix/wildcard nên không thể invalidate đúng sau mỗi
+    create/update/remove. Cùng lý do đã khiến SubCategoriesService bỏ qua cache
+    khi có filter
+  - BREAKING CHANGE đã xử lý dứt điểm (không giữ song song format cũ): 3 call
+    site Frontend đã sửa cùng commit — `app/page.tsx` và
+    `app/accessories/page.tsx` (đọc `items`, gọi `limit=100`, GIỮ NGUYÊN lọc
+    client-side), `app/admin/products/page.tsx` (phân trang + search có
+    debounce 400ms + 3 filter đều SERVER-SIDE, đã xóa `filteredProducts`/
+    `paginatedProducts`)
+  - ⚠️ Storefront (trang chủ + /accessories) CHƯA phân trang thật — CỐ Ý hoãn,
+    không phải bỏ sót. Trang chủ lọc client theo Category + KHOẢNG GIÁ, mà
+    backend chưa có filter giá; phân trang thật ngay sẽ khiến lọc giá chỉ áp
+    dụng trong 1 trang → sai. Muốn làm tiếp: thêm `minPrice`/`maxPrice` vào
+    QueryProductDto TRƯỚC, rồi mới viết lại UI storefront
+  - ⚠️ Frontend TUYỆT ĐỐI không được gửi param sentinel kiểu `categoryId=ALL`
+    — `forbidNonWhitelisted` + `@IsUUID` sẽ trả 400. Không lọc thì bỏ hẳn
+    param đó ra khỏi request
+  - ⚠️ DB chưa có index trên `createdAt`/`isActive`/`price`/`title` — sort mặc
+    định và `search` hiện quét tuần tự. Chưa ảnh hưởng ở quy mô hiện tại,
+    nhưng là việc cần làm khi catalog lớn
 
 ### Hạ tầng quản lý mã nguồn (MỚI)
 - Git repo đã khởi tạo tại thư mục gốc D:\Projects\quoce_store (KHÔNG phải
@@ -180,22 +209,10 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
 
 ## VIỆC CẦN LÀM TIẾP — THEO ĐÚNG THỨ TỰ ƯU TIÊN
 
-### 1. Hoàn tất Nhóm B — Phân trang (làm NGAY, đang dở)
-- ProductController: GET /products và GET /products/admin/all nhận query
-  params page (default 1), limit (default 20, max 100), và optional filters
-  categoryId/subCategoryId/brandId/search (theo title, dùng Prisma `contains`
-  + mode:'insensitive')
-- ProductService: dùng Prisma `skip`/`take`, trả về
-  { items, total, page, limit, totalPages }
-- QUAN TRỌNG: đây LÀ thay đổi breaking change cho Frontend — mọi nơi đang gọi
-  GET /products và đọc thẳng response như mảng (res.data hoặc res.data.data
-  là array) sẽ cần sửa để đọc res.data.items thay vào đó. Rà soát các file:
-  HomePage (page.tsx), AccessoriesPage, ProductCard consumers. Test kỹ từng
-  trang sau khi đổi, đây chính là loại lỗi đã gây vỡ TransformInterceptor —
-  cẩn thận tương tự.
-- Viết migration path: cân nhắc giữ endpoint cũ trả full array cho 1 giai
-  đoạn transition, hoặc sửa dứt điểm 1 lần + sửa hết Frontend cùng lúc (khuyến
-  nghị cách 2, dự án còn nhỏ, ít risk hơn để 2 format song song).
+### 1. ✅ ĐÃ XONG — Hoàn tất Nhóm B (Phân trang)
+Xem chi tiết đầy đủ ở mục "ĐÃ HOÀN THÀNH → Nhóm B" phía trên. Việc còn nợ lại
+có chủ ý (KHÔNG phải bỏ sót): phân trang server-side cho storefront, chỉ làm
+sau khi đã thêm `minPrice`/`maxPrice` vào `QueryProductDto`.
 
 ### 2. Nhóm F — Hoàn thiện nghiệp vụ còn dang dở
 - Nối Discount thật vào OrdersService.create(): nhận discountCode optional

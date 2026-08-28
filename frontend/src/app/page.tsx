@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ENV } from '@/config/env';
 import ProductCard from '@/components/common/ProductCard';
-import { Product } from '@/types';
+import { Product, Paginated } from '@/types';
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -15,21 +15,23 @@ export default function HomePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // ⚡ Nhóm B: GET /products nay TRẢ VỀ DẠNG PHÂN TRANG
+        // { items, total, page, limit, totalPages } thay vì mảng thô.
+        // Trang chủ tạm thời vẫn lọc client-side (theo Category + khoảng giá)
+        // nên xin thẳng limit=100 (mức trần backend cho phép) để thấy đủ
+        // catalog hiện tại. Khi catalog vượt 100 sản phẩm, PHẢI chuyển trang
+        // này sang phân trang server-side thật — và khi đó cần bổ sung filter
+        // giá (minPrice/maxPrice) ở backend trước, vì lọc giá client sẽ chỉ
+        // còn lọc trong 1 trang. Xem PROGRESS.md để biết lý do hoãn.
         const [prodRes, catRes] = await Promise.all([
-          fetch(`${ENV.apiUrl}/products`),
+          fetch(`${ENV.apiUrl}/products?limit=100`),
           fetch(`${ENV.apiUrl}/products/categories`)
         ]);
 
-        const prodResult = await prodRes.json();
+        const prodResult: Paginated<Product> = await prodRes.json();
         const catResult = await catRes.json();
 
-        let items: Product[] = [];
-        if (Array.isArray(prodResult)) {
-          items = prodResult;
-        } else if (prodResult.data && Array.isArray(prodResult.data)) {
-          items = prodResult.data;
-        }
-        setProducts(items);
+        setProducts(Array.isArray(prodResult?.items) ? prodResult.items : []);
 
         if (catResult) {
           const cats = Array.isArray(catResult) ? catResult : catResult.data || [];

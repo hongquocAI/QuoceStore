@@ -56,3 +56,15 @@ export interface Product {
   brand?: Brand;
   variants?: ProductVariant[];
 }
+
+/**
+ * Shape chuẩn của các endpoint danh sách có phân trang ở backend
+ * (hiện tại: GET /products và GET /products/admin/all — Nhóm B).
+ */
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

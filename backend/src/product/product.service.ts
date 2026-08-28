@@ -4,6 +4,7 @@ import type { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { QueryProductDto } from './dto/query-product.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -108,19 +109,87 @@ export class ProductService {
     throw new ConflictException('Không thể sinh mã SKU duy nhất, vui lòng thử lại hoặc nhập SKU thủ công.');
   }
 
-  async findAll() {
-    return await this.prisma.product.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'desc' },
-      include: { category: true, subCategory: true, brand: true, variants: true },
-    });
+  // ⚡ Nhóm B — PHÂN TRANG:
+  //
+  // `include` đầy đủ 4 quan hệ (category/subCategory/brand/variants) được giữ
+  // nguyên như trước để Frontend không phải đổi cách render từng sản phẩm —
+  // nhưng chính vì payload mỗi bản ghi nặng như vậy, việc trả về TOÀN BỘ bảng
+  // như code cũ là nút thắt thật khi catalog lớn lên. Nay mọi lời gọi đều bị
+  // giới hạn bởi `take` (tối đa 100, xem QueryProductDto).
+  //
+  // ❗ KHÔNG cache danh sách sản phẩm ở đây — có chủ ý. Theo đúng tiền lệ đã
+  // áp dụng ở SubCategoriesService: chỉ cache lời gọi KHÔNG filter, bỏ qua
+  // cache khi có filter, "để tránh nổ số lượng cache key". Ở đây mọi lời gọi
+  // đều mang page/limit/filter nên số tổ hợp key là vô hạn; hơn nữa cache
+  // backend là Redis qua Keyv — interface `Cache` không hỗ trợ xoá theo
+  // prefix/wildcard, nên các key đó sẽ KHÔNG THỂ invalidate đúng sau mỗi lần
+  // create/update/remove sản phẩm. Cache sai còn tệ hơn không cache.
+  private buildProductWhere(
+    query: QueryProductDto,
+    publicOnly: boolean,
+  ): Prisma.ProductWhereInput {
+    const where: Prisma.ProductWhereInput = {};
+
+    // Storefront công khai chỉ được thấy sản phẩm đang bán. Schema KHÔNG có
+    // isDeleted/deletedAt — `isActive` là cờ hiển thị duy nhất, và cũng chính
+    // là cờ mà remove() lật xuống false khi sản phẩm đã có lịch sử đơn hàng
+    // (soft-delete). Admin thì thấy hết.
+    if (publicOnly) where.isActive = true;
+
+    if (query.categoryId) where.categoryId = query.categoryId;
+    if (query.subCategoryId) where.subCategoryId = query.subCategoryId;
+    if (query.brandId) where.brandId = query.brandId;
+
+    // Tìm theo title HOẶC sku — giữ đúng hành vi ô tìm kiếm sẵn có của trang
+    // Admin (trước đây lọc ở client theo cả 2 trường này).
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    return where;
   }
 
-  async findAllForAdmin() {
-    return await this.prisma.product.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: { category: true, subCategory: true, brand: true, variants: true },
-    });
+  private async findPaginated(query: QueryProductDto, publicOnly: boolean) {
+    // Giá trị mặc định trong DTO chỉ áp dụng khi param vắng mặt; vẫn chốt lại
+    // ở đây để service an toàn kể cả khi được gọi trực tiếp (VD từ test).
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where = this.buildProductWhere(query, publicOnly);
+
+    // $transaction để findMany và count đọc trên cùng 1 ảnh chụp dữ liệu —
+    // tránh trường hợp total lệch với items khi có ghi xen giữa 2 truy vấn.
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { category: true, subCategory: true, brand: true, variants: true },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      // Không có kết quả vẫn trả 1 (không phải 0) để UI luôn hiển thị được
+      // "Trang 1 / 1" thay vì "Trang 1 / 0".
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  async findAll(query: QueryProductDto) {
+    return await this.findPaginated(query, true);
+  }
+
+  async findAllForAdmin(query: QueryProductDto) {
+    return await this.findPaginated(query, false);
   }
 
   async findOne(slug: string) {

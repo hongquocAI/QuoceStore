@@ -12,7 +12,8 @@ depth), khả năng mở rộng, và khả năng quan sát hệ thống (observa
   mã đơn + số điện thoại
 - **Quản trị (Admin)**: CRUD sản phẩm với biến thể, quản lý danh mục/thương
   hiệu (Brand/SubCategory) qua dropdown động, upload ảnh theo cấu trúc phân
-  tầng trên Cloudinary
+  tầng trên Cloudinary; danh sách sản phẩm phân trang phía server kèm tìm kiếm
+  (tên/SKU) và lọc theo danh mục, danh mục con, thương hiệu
 - **Trợ lý AI**: tư vấn mua sắm dựa trên catalog thật (Google Gemini)
 - **Xác thực**: JWT qua cookie `HttpOnly`, Refresh Token rotation, rate
   limiting theo từng endpoint nhạy cảm

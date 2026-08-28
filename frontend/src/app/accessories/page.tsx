@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import ProductCard from '@/components/common/ProductCard';
-import { Product } from '@/types';
+import { Product, Paginated } from '@/types';
 
 export default function AccessoriesPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -10,12 +10,14 @@ export default function AccessoriesPage() {
   const [selectedSubCategory, setSelectedSubCategory] = useState('all');
 
   useEffect(() => {
+    // ⚡ Nhóm B: GET /products trả { items, total, page, limit, totalPages }.
+    // Trang này vẫn lọc client-side theo subCategory.slug nên xin limit=100
+    // (trần backend) để thấy đủ catalog hiện tại — xem chú thích cùng nội
+    // dung ở app/page.tsx và lý do hoãn trong PROGRESS.md.
     api
-      .get('/products')
+      .get<Paginated<Product>>('/products', { params: { limit: 100 } })
       .then((res) => {
-        const data = res.data;
-        const items = Array.isArray(data) ? data : data.data || [];
-        setProducts(items);
+        setProducts(Array.isArray(res.data?.items) ? res.data.items : []);
       })
       .catch((err) => console.error('Lỗi tải sản phẩm phụ kiện:', err))
       .finally(() => setLoading(false));

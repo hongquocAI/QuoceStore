@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { Paginated } from '@/types';
 
 interface Category {
   id: string;
@@ -77,11 +78,24 @@ export default function AdminProductsPage() {
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]); // ⚡ MỚI
   const [brands, setBrands] = useState<Brand[]>([]); // ⚡ MỚI
   const [loading, setLoading] = useState(true);
+  // Tách riêng trạng thái tải BẢNG sản phẩm khỏi `loading` (tải master data
+  // lần đầu) — nếu dùng chung, mỗi lần đổi trang/gõ tìm kiếm sẽ nuốt cả giao
+  // diện vào màn hình "ĐANG TẢI..." toàn trang, mất luôn ô tìm kiếm đang gõ.
+  const [productsLoading, setProductsLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
 
+  // ⚡ Nhóm B — PHÂN TRANG SERVER-SIDE:
+  // Trước đây trang này tải TOÀN BỘ sản phẩm rồi lọc + cắt trang ở client.
+  // Nay mọi thứ (search, 3 filter, phân trang) đều do backend làm; state dưới
+  // đây chỉ còn là tham số gửi lên API.
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
+  const [selectedSubCategoryFilter, setSelectedSubCategoryFilter] = useState('ALL');
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
   const itemsPerPage = 10;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,19 +137,18 @@ export default function AdminProductsPage() {
     }
   }, [user, authLoading]);
 
+  // ⚡ Nhóm B: tách làm 2 — dữ liệu dropdown (Category/SubCategory/Brand) chỉ
+  // cần nạp MỘT LẦN, còn danh sách sản phẩm phải nạp lại mỗi khi đổi
+  // trang/filter/search. Gộp chung như trước sẽ tải lại 3 bảng master data
+  // vô ích ở mỗi lần bấm "Trang sau".
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      // ⚡ MỚI: đổ thêm Brand + SubCategory (toàn bộ, filter theo Category
-      // sẽ làm ở client qua filteredSubCategories phía trên) song song
-      // với products/categories cho nhanh.
-      const [prodRes, catRes, subCatRes, brandRes] = await Promise.all([
-        api.get('/products/admin/all'),
+      const [catRes, subCatRes, brandRes] = await Promise.all([
         api.get('/products/categories'),
         api.get('/sub-categories'),
         api.get('/brands'),
       ]);
-      setProducts(prodRes.data);
       setCategories(catRes.data);
       setSubCategories(subCatRes.data);
       setBrands(brandRes.data);
@@ -149,6 +162,66 @@ export default function AdminProductsPage() {
       setLoading(false);
     }
   };
+
+  // ⚡ Nhóm B: chống dội request — mỗi ký tự gõ vào ô tìm kiếm KHÔNG bắn ngay
+  // 1 request lên server nữa (trước đây lọc ở client nên không thành vấn đề).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // đổi từ khóa thì luôn quay về trang 1
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // ⚡ Nhóm B: nạp danh sách sản phẩm theo trang + filter, hoàn toàn server-side.
+  const fetchProducts = useCallback(async () => {
+    try {
+      setProductsLoading(true);
+      // ❗ ValidationPipe backend bật forbidNonWhitelisted: gửi param không
+      // khai báo trong QueryProductDto sẽ ăn 400. Vì vậy CHỈ đính kèm param
+      // khi thực sự có lọc — tuyệt đối không gửi sentinel 'ALL' lên server.
+      const params: Record<string, string | number> = {
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      if (selectedCategoryFilter !== 'ALL') params.categoryId = selectedCategoryFilter;
+      if (selectedSubCategoryFilter !== 'ALL') params.subCategoryId = selectedSubCategoryFilter;
+      if (selectedBrandFilter !== 'ALL') params.brandId = selectedBrandFilter;
+
+      const res = await api.get<Paginated<Product>>('/products/admin/all', { params });
+      setProducts(Array.isArray(res.data?.items) ? res.data.items : []);
+      setTotalPages(res.data?.totalPages ?? 1);
+      setTotalProducts(res.data?.total ?? 0);
+
+      // Ca biên: xóa bản ghi cuối cùng của trang cuối làm currentPage vượt quá
+      // số trang còn lại -> bảng sẽ trắng trơn. Lùi về trang cuối hợp lệ,
+      // effect bên dưới sẽ tự nạp lại.
+      if (res.data?.totalPages && currentPage > res.data.totalPages) {
+        setCurrentPage(res.data.totalPages);
+      }
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setMessage({ type: 'error', text: 'BẠN KHÔNG CÓ QUYỀN TRUY CẬP DỮ LIỆU NÀY.' });
+      } else {
+        setMessage({ type: 'error', text: 'Không thể tải danh sách sản phẩm.' });
+      }
+    } finally {
+      setProductsLoading(false);
+    }
+  }, [
+    currentPage,
+    debouncedSearch,
+    selectedCategoryFilter,
+    selectedSubCategoryFilter,
+    selectedBrandFilter,
+  ]);
+
+  useEffect(() => {
+    if (!authLoading && user?.role === 'ADMIN') {
+      fetchProducts();
+    }
+  }, [authLoading, user, fetchProducts]);
 
   // ⚡ Thuật toán sinh Slug và SKU an toàn, chống tràn khi tên quá dài
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -496,7 +569,9 @@ export default function AdminProductsPage() {
     }
 
       setIsModalOpen(false);
-      fetchInitialData();
+      // ⚡ Nhóm B: chỉ nạp lại DANH SÁCH sản phẩm (trang hiện tại), không cần
+      // tải lại master data cho dropdown.
+      fetchProducts();
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Đã có lỗi hệ thống xảy ra.' });
     }
@@ -508,26 +583,15 @@ export default function AdminProductsPage() {
     try {
       await api.delete(`/products/${id}`);
       setMessage({ type: 'success', text: 'ĐÃ XÓA SẢN PHẨM KHỎI HỆ THỐNG!' });
-      fetchInitialData();
+      fetchProducts();
     } catch (err: any) {
       setMessage({ type: 'error', text: 'Không thể xóa sản phẩm.' });
     }
   };
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(prod => {
-      const matchesSearch = prod.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (prod.sku && prod.sku.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesCategory = selectedCategoryFilter === 'ALL' || prod.categoryId === selectedCategoryFilter;
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, searchTerm, selectedCategoryFilter]);
-
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage) || 1;
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredProducts.slice(start, start + itemsPerPage);
-  }, [filteredProducts, currentPage]);
+  // ⚡ Nhóm B: đã XÓA `filteredProducts` và `paginatedProducts` (lọc + cắt
+  // trang ở client trên toàn bộ dữ liệu). `products` giờ CHÍNH LÀ đúng 1
+  // trang kết quả đã được server lọc sẵn, render thẳng ra bảng.
 
   if (authLoading || loading) {
     return (
@@ -567,24 +631,55 @@ export default function AdminProductsPage() {
           </div>
         )}
 
+        {/* ⚡ Nhóm B: toàn bộ ô tìm kiếm + 3 dropdown dưới đây gửi thẳng lên
+            server (có debounce 400ms cho ô tìm kiếm), không còn lọc ở client. */}
         <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
           <input
             type="text"
             placeholder="TÌM KIẾM THEO TÊN SẢN PHẨM HOẶC MÃ SKU..."
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full md:w-96 bg-white border border-gray-300 text-xs font-medium px-4 py-3 rounded-none focus:outline-none focus:border-black uppercase"
           />
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Lọc danh mục:</span>
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <select
               value={selectedCategoryFilter}
-              onChange={(e) => { setSelectedCategoryFilter(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setSelectedCategoryFilter(e.target.value);
+                // Đổi danh mục cha thì bỏ luôn lọc danh mục con đang chọn —
+                // nếu không, 2 filter dễ chọi nhau và ra 0 kết quả khó hiểu.
+                setSelectedSubCategoryFilter('ALL');
+                setCurrentPage(1);
+              }}
               className="bg-white border border-gray-300 text-xs font-bold uppercase px-4 py-3 rounded-none cursor-pointer"
             >
               <option value="ALL">TẤT CẢ DANH MỤC</option>
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedSubCategoryFilter}
+              onChange={(e) => { setSelectedSubCategoryFilter(e.target.value); setCurrentPage(1); }}
+              className="bg-white border border-gray-300 text-xs font-bold uppercase px-4 py-3 rounded-none cursor-pointer"
+            >
+              <option value="ALL">TẤT CẢ DANH MỤC CON</option>
+              {subCategories
+                .filter(sc => selectedCategoryFilter === 'ALL' || sc.categoryId === selectedCategoryFilter)
+                .map(sc => (
+                  <option key={sc.id} value={sc.id}>{sc.name}</option>
+                ))}
+            </select>
+
+            <select
+              value={selectedBrandFilter}
+              onChange={(e) => { setSelectedBrandFilter(e.target.value); setCurrentPage(1); }}
+              className="bg-white border border-gray-300 text-xs font-bold uppercase px-4 py-3 rounded-none cursor-pointer"
+            >
+              <option value="ALL">TẤT CẢ THƯƠNG HIỆU</option>
+              {brands.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
           </div>
@@ -607,14 +702,20 @@ export default function AdminProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 text-xs font-medium">
-              {paginatedProducts.length === 0 ? (
+              {productsLoading ? (
+                <tr>
+                  <td colSpan={10} className="p-12 text-center text-gray-400 uppercase tracking-wider animate-pulse">
+                    Đang tải danh sách sản phẩm...
+                  </td>
+                </tr>
+              ) : products.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="p-12 text-center text-gray-400 uppercase tracking-wider">
                     Không tìm thấy sản phẩm phù hợp trong cơ sở dữ liệu.
                   </td>
                 </tr>
               ) : (
-                paginatedProducts.map((prod) => (
+                products.map((prod) => (
                   <tr key={prod.id} className="hover:bg-gray-50 transition">
                     <td className="p-4">
                       <div className="w-12 h-12 bg-gray-100 border border-gray-300 rounded-none overflow-hidden">
@@ -675,27 +776,30 @@ export default function AdminProductsPage() {
           </table>
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200 text-xs font-bold uppercase">
-            <span className="text-gray-500">Trang {currentPage} / {totalPages}</span>
-            <div className="flex gap-2">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                className="px-4 py-2 bg-gray-100 disabled:opacity-40 hover:bg-black hover:text-white transition"
-              >
-                Trang trước
-              </button>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                className="px-4 py-2 bg-gray-100 disabled:opacity-40 hover:bg-black hover:text-white transition"
-              >
-                Trang sau
-              </button>
-            </div>
+        {/* ⚡ Nhóm B: `totalPages` và `totalProducts` nay đến TỪ SERVER, không
+            còn tính từ độ dài mảng đã tải về. Luôn hiển thị (kể cả 1 trang) để
+            Admin thấy được tổng số sản phẩm khớp bộ lọc hiện tại. */}
+        <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200 text-xs font-bold uppercase">
+          <span className="text-gray-500">
+            Trang {currentPage} / {totalPages} — Tổng {totalProducts} sản phẩm
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={currentPage === 1 || productsLoading}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              className="px-4 py-2 bg-gray-100 disabled:opacity-40 hover:bg-black hover:text-white transition"
+            >
+              Trang trước
+            </button>
+            <button
+              disabled={currentPage >= totalPages || productsLoading}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              className="px-4 py-2 bg-gray-100 disabled:opacity-40 hover:bg-black hover:text-white transition"
+            >
+              Trang sau
+            </button>
           </div>
-        )}
+        </div>
 
       </div>
 

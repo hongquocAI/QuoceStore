@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { QueryProductDto } from './dto/query-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -12,9 +13,14 @@ import { Role } from '@prisma/client';
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
+  // ⚡ Nhóm B — PHÂN TRANG (BREAKING CHANGE có chủ ý):
+  // Route này KHÔNG còn trả mảng thô. Shape mới là
+  // { items, total, page, limit, totalPages }.
+  // Quyết định không giữ song song 2 format (xem PROGRESS.md) — toàn bộ
+  // Frontend đã được sửa cùng lúc trong chính commit này.
   @Get()
-  async findAll() {
-    return await this.productService.findAll();
+  async findAll(@Query() query: QueryProductDto) {
+    return await this.productService.findAll(query);
   }
 
   @Get('categories')
@@ -29,8 +35,11 @@ export class ProductController {
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async findAllForAdmin() {
-    return await this.productService.findAllForAdmin();
+  // Cũng trả shape phân trang như trên. Trang Admin dùng thật năng lực này:
+  // page/limit + filter categoryId/subCategoryId/brandId/search đều chạy
+  // server-side (trước đây lọc và cắt trang hoàn toàn ở client).
+  async findAllForAdmin(@Query() query: QueryProductDto) {
+    return await this.productService.findAllForAdmin(query);
   }
 
   @Get(':slug')
