@@ -271,9 +271,49 @@ export class ProductService {
         // slug KHÔNG xuất hiện ở đây — bất biến, đúng nguyên tắc SEO.
       };
 
+      // 🛡️ FIX: trước đây `dto.variants` được DTO validate rồi VỨT ĐI IM LẶNG
+      // (object `data` phía trên không hề có key `variants`) — Admin sửa màu
+      // sắc/tồn kho biến thể thì UI báo "thành công" nhưng DB không hề đổi.
+      //
+      // Cách xử lý: XÓA SẠCH variant cũ rồi TẠO LẠI từ payload (thay vì so
+      // khớp/upsert từng cái). An toàn vì `OrderItem.variantId` là
+      // `onDelete: SetNull` VÀ OrderItem đã lưu sẵn `variantColorName` như 1
+      // bản snapshot tại thời điểm mua — nên variant có bị đổi id thì lịch sử
+      // đơn hàng cũ vẫn giữ đúng tên màu khách đã chọn.
+      //
+      // Phân biệt 3 trường hợp:
+      //   - dto.variants === undefined  -> KHÔNG đụng gì tới variants
+      //   - dto.variants === []         -> xóa hết, sản phẩm thành hàng đơn lẻ
+      //   - dto.variants có phần tử     -> xóa hết rồi tạo lại đúng danh sách
+      if (dto.variants !== undefined) {
+        await tx.productVariant.deleteMany({ where: { productId: id } });
+      }
+
+      // Giá biến thể bỏ trống thì lấy theo giá sản phẩm — giống hệt create().
+      // Ở update, dto.price có thể không được gửi lên nên phải lùi về giá
+      // hiện tại trong DB thay vì để undefined.
+      const fallbackPrice = dto.price ?? product.price;
+
       return await tx.product.update({
         where: { id },
-        data,
+        data: {
+          ...data,
+          ...(dto.variants !== undefined &&
+            dto.variants.length > 0 && {
+              variants: {
+                create: dto.variants.map((v) => ({
+                  colorCode: v.colorCode,
+                  colorName: v.colorName,
+                  hexCode: v.hexCode,
+                  price: v.price && v.price > 0 ? v.price : fallbackPrice,
+                  stock: v.stock ?? 0,
+                  images: v.images ?? [],
+                })),
+              },
+            }),
+        },
+        // `include` chạy SAU khi ghi -> trả về đúng danh sách variant MỚI,
+        // Frontend hiển thị đúng ngay, không cần F5.
         include: { variants: true, category: true, subCategory: true, brand: true },
       });
     });

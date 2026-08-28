@@ -106,6 +106,25 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
 - Cart: giỏ hàng theo đúng variantId, giá đúng theo biến thể, tồn kho trừ đúng
   theo variant nếu có chọn màu
 
+### ⚠️ BÀI HỌC: payload variants gửi lên POST/PATCH /products
+Khi Frontend gửi mảng `variants`, PHẢI map TƯỜNG MINH đúng 6 field mà
+`ProductVariantDto` chấp nhận: `colorCode`, `colorName`, `hexCode`, `price`,
+`stock`, `images`. TUYỆT ĐỐI KHÔNG gửi lại nguyên object variant vừa đọc từ
+`GET /products/:slug` — object đó có kèm `id`/`productId`/`createdAt`/
+`updatedAt`, và `forbidNonWhitelisted: true` sẽ trả 400
+`variants.0.property id should not exist`. Lỗi này từng làm Admin không sửa
+được sản phẩm có biến thể màu, kéo theo không bật lại được `isActive` →
+storefront trắng trơn, mất khá nhiều thời gian truy nguyên vì triệu chứng
+nhìn không liên quan gì tới variants. Dùng map tường minh, KHÔNG dùng
+destructuring `({ id, ...rest }) => rest` — cách đó sẽ lại rò field mới mỗi
+khi bảng `ProductVariant` thêm cột.
+
+`ProductService.update()` xử lý variants theo kiểu **xóa sạch rồi tạo lại**
+(không upsert so khớp). An toàn vì `OrderItem.variantId` là
+`onDelete: SetNull` và `OrderItem.variantColorName` đã snapshot sẵn tên màu
+lúc mua. Quy ước 3 ca: `variants` không gửi → giữ nguyên; gửi `[]` → xóa hết;
+gửi có phần tử → thay thế toàn bộ.
+
 ### Phase 1 — MDM (Master Data Management)
 - Brand, SubCategory là bảng quan hệ thật (FK), không còn string tự do
   categorySlug/subCategorySlug/brandSlug/brandName trên Product

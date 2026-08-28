@@ -67,11 +67,12 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 
 - ✅ ~~Sản phẩm test sót trong DB~~ — **ĐÃ XỬ LÝ 2026-08-29**: xóa sạch 6 đơn
   test + 6 orderItem + sản phẩm test, có lưu vết đầy đủ trong Nhật ký chi tiết.
-- 🔴 **Sản phẩm thật duy nhất đang bị ẩn** (`isActive = false`) → storefront
-  không hiển thị sản phẩm nào, `GET /products` trả `total=0`. Nhiều khả năng
-  do bấm nút "Xóa" trên trang Admin khi sản phẩm còn đơn hàng tham chiếu →
-  `remove()` soft-delete đúng thiết kế. **Cần quyết định**: bật lại
-  `isActive = true`, hay cứ để ẩn.
+- 🟡 **Sản phẩm thật duy nhất đang bị ẩn** (`isActive = false`) → storefront
+  không hiển thị sản phẩm nào, `GET /products` trả `total=0`.
+  **Nguyên nhân thật đã tìm ra** (khác hẳn phỏng đoán ban đầu là "bấm nhầm nút
+  Xóa"): `PATCH /products/:id` trả 400 nên **không thể lưu lại** `isActive`
+  = true qua Admin UI — xem entry bug trong Nhật ký chi tiết. Bug đã sửa;
+  chỉ còn chờ bật lại cờ này qua UI để đóng hoàn toàn.
 - **Storefront chưa phân trang server-side** — cố ý hoãn, lý do đầy đủ ghi ở
   mục "Đang làm" phía trên. Điều kiện tiên quyết: thêm `minPrice`/`maxPrice`
   vào `QueryProductDto`.
@@ -81,6 +82,17 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
   đang có rất ít sản phẩm) nhưng sẽ thành vấn đề thật khi catalog lớn.
 
 ### 🔍 Cần người dùng kiểm tra (chưa tự verify được trong phiên này)
+
+**ƯU TIÊN 1 — xác minh bản sửa bug PATCH variants (2026-08-29):**
+1. Mở `/admin/products` → Sửa sản phẩm Baseus → tick **"Đang bán"** → Lưu.
+   Phải **thành công**, không còn 400 `variants.0.property id should not exist`.
+2. Gọi `GET /products` → phải trả `total = 1`; mở trang chủ `/` phải thấy lại
+   sản phẩm.
+3. Sửa **giá hoặc tồn kho của 1 màu** của Baseus → Lưu → **F5 lại trang** →
+   xác nhận giá/tồn kho mới **thực sự đã lưu** (trước khi sửa, đây là ca
+   "báo thành công giả": UI báo OK nhưng DB không đổi gì).
+
+**Các mục còn lại (từ Nhóm B):**
 Backend đã được verify đầy đủ bằng request thật (xem nhật ký chi tiết). Phần
 **chưa** tự kiểm tra được là tương tác UI của trang `/admin/products`, vì cần
 đăng nhập tài khoản ADMIN (agent không có credential) và phiên này không có
@@ -303,7 +315,62 @@ thường của Postgres, không phải lỗi.
 - Toàn bộ script tạm (`tmp-inspect.js`, `tmp-dump.js`, `tmp-cleanup.js`,
   `tmp-check.js`) đã xóa khỏi `backend/`, `git status` sạch.
 
-⚠️ **PHÁT HIỆN NGOÀI DỰ KIẾN trong lúc xác minh**: sản phẩm thật còn lại đang
+### [2026-08-29] Đã sửa BUG: PATCH /products/:id trả 400 + variants không được lưu
+
+**Triệu chứng**: sửa sản phẩm có biến thể màu qua Admin UI → 400
+`variants.0.property id should not exist`. Đây chính là **nguyên nhân gốc**
+khiến sản phẩm Baseus không lưu lại được `isActive = true`, dẫn tới
+`GET /products` trả `total = 0` và storefront trắng trơn (trước đó đã phỏng
+đoán nhầm là do bấm nút "Xóa" làm soft-delete — **phỏng đoán đó SAI**).
+
+**Nguyên nhân (Frontend)**: `admin/products/page.tsx` — `handleOpenEdit` nạp
+`variants: product.variants || []` **nguyên xi** từ `GET /products/:slug`,
+object đó mang theo `id`/`productId`/`createdAt`/`updatedAt`; rồi
+`handleSubmit` đưa thẳng vào payload PATCH. `ProductVariantDto` chỉ chấp nhận
+**6 field** (`colorCode`, `colorName`, `hexCode`, `price`, `stock`, `images`)
+và `forbidNonWhitelisted: true` chặn đúng field thừa. **Backend không sai —
+không nới lỏng validate.**
+
+**Bug thứ 2 phát hiện kèm (nghiêm trọng hơn)**: `ProductService.update()`
+nhận `dto.variants`, validate nó, rồi **VỨT ĐI IM LẶNG** — object
+`Prisma.ProductUpdateInput` không hề có key `variants`. Hệ quả: sửa màu
+sắc/giá/tồn kho biến thể qua Admin UI **không bao giờ được lưu**, mà UI vẫn
+báo "CẬP NHẬT THÀNH CÔNG" → mất dữ liệu âm thầm. (`create()` thì xử lý
+variants đàng hoàng, chỉ `update()` bỏ sót.)
+
+- **File đã sửa**:
+  - `frontend/src/app/admin/products/page.tsx` — thêm `sanitizedVariants`,
+    map **tường minh** đúng 6 field trước khi đưa vào `basePayload` (dùng cho
+    cả POST lẫn PATCH). Cố ý KHÔNG dùng destructuring `({ id, ...rest })` để
+    mai sau bảng `ProductVariant` thêm cột mới thì payload không tự rò field
+    lạ lên API và vỡ lại đúng lỗi này.
+  - `backend/src/product/product.service.ts` — `update()` nay xử lý variants
+    theo **Phương án A (người dùng chọn)**: xóa sạch variant cũ
+    (`deleteMany`) rồi tạo lại từ payload, TRONG CÙNG transaction. Phân biệt
+    3 ca: `undefined` → không đụng tới; `[]` → xóa hết (thành hàng đơn lẻ);
+    có phần tử → xóa rồi tạo lại. Giá biến thể bỏ trống thì lùi về
+    `dto.price ?? product.price` (ở update, `dto.price` có thể không được gửi
+    lên nên không dùng thẳng như `create()`). `include: { variants: true }`
+    chạy SAU khi ghi nên response trả về đúng danh sách variant **MỚI**,
+    Frontend hiển thị đúng ngay không cần F5.
+
+- **Vì sao Phương án A an toàn** (lý do người dùng đưa ra, đã đối chiếu
+  schema và xác nhận đúng): `OrderItem.variantId` là `onDelete: SetNull`, VÀ
+  `OrderItem.variantColorName` đã lưu sẵn tên màu như một **snapshot** tại
+  thời điểm mua. Nên variant bị đổi id không làm mất thông tin màu trong lịch
+  sử đơn hàng cũ → không cần logic upsert so khớp từng variant cho phức tạp.
+
+- **Đã test**: `npx tsc --noEmit` cả backend và frontend → **0 lỗi**.
+  ⚠️ **CHƯA tự chạy được kịch bản UI** (cần login ADMIN, agent không có
+  credential) — xem mục "🔍 Cần người dùng kiểm tra" ở phần Trạng thái.
+  Cố ý **KHÔNG** tự bật `isActive = true` bằng lệnh ghi thẳng vào DB, vì làm
+  vậy sẽ che mất chính phép thử cần chạy (lưu qua UI phải thành công).
+
+---
+
+⚠️ **PHÁT HIỆN NGOÀI DỰ KIẾN trong lúc xác minh** *(ghi lúc chưa tìm ra
+nguyên nhân thật — xem entry ngay bên trên để biết kết luận cuối cùng)*:
+sản phẩm thật còn lại đang
 có `isActive = false`, nên `GET /products` trả `total=0` và **storefront hiện
 không hiển thị sản phẩm nào**. Bằng chứng: `updatedAt` của sản phẩm này là
 2026-08-28T21:12:01Z, tức bị sửa ~10 phút TRƯỚC thời điểm chạy script dọn dẹp

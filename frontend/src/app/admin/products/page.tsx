@@ -540,6 +540,24 @@ export default function AdminProductsPage() {
         throw new Error('Định dạng JSON trong thông số kỹ thuật (Specs) không hợp lệ.');
       }
 
+      // 🛡️ FIX BUG 400 "variants.0.property id should not exist":
+      // handleOpenEdit nạp nguyên object variant đọc từ GET /products/:slug,
+      // kèm theo id/productId/createdAt/updatedAt. ProductVariantDto ở backend
+      // CHỈ chấp nhận đúng 6 field dưới đây, và ValidationPipe đang bật
+      // forbidNonWhitelisted nên mọi field thừa đều làm request bị từ chối.
+      //
+      // Map TƯỜNG MINH thay vì destructuring kiểu ({ id, ...rest }) => rest —
+      // để sau này bảng ProductVariant có thêm cột mới thì payload không tự
+      // động rò field lạ lên API và vỡ lại đúng lỗi này.
+      const sanitizedVariants = formData.variants.map((v) => ({
+        colorCode: v.colorCode,
+        colorName: v.colorName,
+        hexCode: v.hexCode,
+        price: Number(v.price) || 0,
+        stock: Number(v.stock) || 0,
+        images: v.images ?? [],
+      }));
+
     const basePayload = {
       title: formData.title,
       sku: formData.sku,
@@ -553,7 +571,7 @@ export default function AdminProductsPage() {
       thumbnail: formData.thumbnail || formData.images[0] || '',
       images: formData.images.length > 0 ? formData.images : (formData.thumbnail ? [formData.thumbnail] : []),
       isActive: formData.isActive,
-      variants: formData.variants,
+      variants: sanitizedVariants,
       highlights: highlightsArray,
       specs: parsedSpecs,
     };
