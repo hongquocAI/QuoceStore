@@ -244,31 +244,44 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
      thành.
    - Không bao giờ báo "đã xong" nếu chưa tự verify được bằng cách chạy thật.
 
-3. **Ghi log tiến độ liên tục** vào file `PROGRESS.md` ở thư mục gốc project
-   (tạo mới nếu chưa có). Mỗi khi hoàn thành 1 mục việc, append vào cuối file
-   theo format:
-   ```
-   ## [Ngày giờ] Đã hoàn thành: <tên việc>
-   - File đã sửa: <danh sách>
-   - Đã test: <cách test + kết quả>
-   - Lưu ý/vấn đề gặp phải: <nếu có>
-   ```
+3. **Ghi log tiến độ vào `PROGRESS.md` — file này có 2 phần riêng biệt, PHẢI
+   cập nhật ĐÚNG cả 2 mỗi lần:**
+   - **Phần "🎯 TRẠNG THÁI HIỆN TẠI"** (đầu file): GHI ĐÈ (không append) —
+     cập nhật lại mục "Đang làm / Việc tiếp theo ngay" và "Đã hoàn thành" cho
+     khớp thực tế mới nhất. Đây là phần người dùng/agent đọc ĐẦU TIÊN mỗi
+     phiên, phải luôn phản ánh đúng NGAY BÂY GIỜ.
+   - **Phần "📜 NHẬT KÝ CHI TIẾT"** (cuối file): APPEND thêm vào CUỐI, không
+     sửa/xóa entry cũ, theo format:
+     ```
+     ### [Ngày giờ] Đã hoàn thành: <tên việc>
+     - File đã sửa: <danh sách>
+     - Đã test: <cách test + kết quả>
+     - Lưu ý/vấn đề gặp phải: <nếu có>
+     ```
+   - Nếu phát hiện vấn đề nhưng CHƯA kịp sửa trong phiên này, ghi vào mục
+     "⚠️ Vấn đề đang biết, CHƯA xử lý" ở phần Trạng thái hiện tại — để không
+     bị quên giữa các phiên.
+   - Nếu phần Nhật ký chi tiết vượt quá ~400-500 dòng, làm theo hướng dẫn cắt
+     bớt (archive) đã ghi sẵn trong chính PROGRESS.md.
 
 4. **NẾU CẢM THẤY SẮP HẾT USAGE/CONTEXT** (nhận thấy cuộc hội thoại đã rất
-   dài, hoặc được thông báo giới hạn), BẮT BUỘC dừng lại và ghi vào cuối
-   `PROGRESS.md` 1 mục đặc biệt:
-   ```
-   ## ⚠️ CHECKPOINT TRƯỚC KHI HẾT USAGE — [ngày giờ]
-   - Đang làm dở: <tên việc cụ thể, đang ở bước nào>
-   - File đang sửa dở (nếu có, chưa hoàn chỉnh): <danh sách + trạng thái>
-   - Bước tiếp theo cần làm ngay khi resume: <mô tả cụ thể, đủ chi tiết để
-     người khác hoặc chính bạn ở phiên sau hiểu ngay không cần đoán>
-   - Lệnh cần chạy để xác nhận trạng thái hiện tại: <VD: npx tsc --noEmit,
-     curl endpoint nào để kiểm tra>
-   ```
-   Sau đó chạy `git add . && git commit -m "checkpoint: <mô tả ngắn>" && git push`
-   NGAY LẬP TỨC (xem mục GIT WORKFLOW bên dưới), rồi DỪNG LẠI — không cố làm
-   thêm dở dang gây rối code.
+   dài, hoặc được thông báo giới hạn), BẮT BUỘC dừng lại và:
+   - Ghi vào phần **"🎯 TRẠNG THÁI HIỆN TẠI"** (ghi đè mục "Đang làm") nội
+     dung checkpoint:
+     ```
+     ⚠️ CHECKPOINT TRƯỚC KHI HẾT USAGE — [ngày giờ]
+     Đang làm dở: <tên việc cụ thể, đang ở bước nào>
+     File đang sửa dở (nếu có, chưa hoàn chỉnh): <danh sách + trạng thái>
+     Bước tiếp theo cần làm ngay khi resume: <mô tả cụ thể, đủ chi tiết để
+       người khác hoặc chính bạn ở phiên sau hiểu ngay không cần đoán>
+     Lệnh cần chạy để xác nhận trạng thái hiện tại: <VD: npx tsc --noEmit,
+       curl endpoint nào để kiểm tra>
+     ```
+   - Đồng thời append 1 entry tương ứng vào phần "📜 NHẬT KÝ CHI TIẾT" để lưu
+     lại mốc này trong lịch sử.
+   - Sau đó chạy `git add . && git commit -m "checkpoint: <mô tả ngắn>" &&
+     git push` NGAY LẬP TỨC (xem mục GIT WORKFLOW bên dưới), rồi DỪNG LẠI —
+     không cố làm thêm dở dang gây rối code.
 
 5. **Ở đầu MỖI phiên làm việc mới**, đọc `PROGRESS.md` trước tiên (nếu tồn
    tại) để biết chính xác trạng thái, tránh làm lại việc đã xong hoặc bỏ sót
@@ -323,6 +336,35 @@ viết thêm 1 API CRUD giống hệt cái đã có trong project, chỉnh CSS/t
 thị, các việc đã có "công thức" rõ ràng trong project — cứ làm thẳng trên
 model hiện tại, không cần hỏi.
 
+## QUẢN LÝ README.md — TÀI LIỆU HƯỚNG RA NGOÀI (khác hẳn CLAUDE.md/PROGRESS.md)
+
+**Phân biệt rõ 2 loại tài liệu, KHÔNG được lẫn lộn giọng văn:**
+
+| | CLAUDE.md / PROGRESS.md | README.md |
+|---|---|---|
+| Đối tượng đọc | Chính bạn (AI agent) ở các phiên sau | Con người: dev khác, nhà tuyển dụng, chính người dùng 6 tháng sau |
+| Giọng văn | Kỹ thuật, chi tiết, kể cả bài học/lỗi đã sửa | Chuyên nghiệp, súc tích, như 1 sản phẩm hoàn chỉnh |
+| Nội dung | Lịch sử debug, quyết định kiến trúc, checkpoint | Cách cài đặt, tính năng, tech stack, cách chạy |
+| KHÔNG được xuất hiện trong README | — | Tên cũ "ApexStore", chi tiết bug đã sửa, nội dung nhắc tới "AI agent"/"Claude Code" đã xây dựng phần này |
+
+**Khi nào PHẢI cập nhật README.md** (trong CÙNG commit với thay đổi code liên
+quan, không tách riêng):
+- Thêm 1 biến môi trường mới bắt buộc (`.env`) → cập nhật bảng biến môi
+  trường trong README
+- Thêm 1 script npm mới quan trọng (VD lệnh seed mới, lệnh test mới) → cập
+  nhật bảng Scripts
+- Thêm 1 tính năng lớn hoàn chỉnh (VD trang quản lý đơn hàng Admin, tính
+  năng Discount thật) → cập nhật mục "Tính năng chính"
+- Đổi cấu trúc thư mục đáng kể (thêm module mới ở backend, thêm route lớn ở
+  frontend) → cập nhật sơ đồ cây thư mục
+
+**KHÔNG cần cập nhật README cho**: sửa bug nhỏ, refactor nội bộ không đổi
+hành vi bên ngoài, thay đổi chỉ ảnh hưởng nội bộ code không ảnh hưởng cách
+người dùng/dev khác tương tác với hệ thống.
+
+**Không bao giờ đặt secret/giá trị thật vào README** — chỉ liệt kê TÊN biến
+môi trường cần có, không bao giờ giá trị, kể cả giá trị mẫu trông giống thật.
+
 ## GIT WORKFLOW
 
 - Repo đã khởi tạo tại thư mục gốc (D:\Projects\quoce_store), remote là
@@ -335,6 +377,10 @@ model hiện tại, không cần hỏi.
   git add .
   git status
   ```
+
+- Trước khi commit, tự hỏi: "Việc vừa làm có cần cập nhật README.md không?"
+  (xem tiêu chí ở mục "QUẢN LÝ README.md" phía trên). Nếu có, cập nhật
+  README.md và đưa vào CHUNG commit này, không tách commit riêng.
 
 - **BẮT BUỘC đọc kỹ output của `git status` TRƯỚC KHI commit.** Nếu thấy bất
   kỳ file nào trong số này xuất hiện trong danh sách staged, DỪNG LẠI NGAY,

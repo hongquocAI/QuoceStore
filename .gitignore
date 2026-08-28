@@ -1,0 +1,32 @@
+# ═══════════════════════════════════════════════════════════════
+# Root .gitignore — lớp bảo vệ bổ sung, phòng trường hợp có file
+# nhạy cảm hoặc rác được tạo ngay tại thư mục gốc (ngoài backend/
+# và frontend/ vốn đã có .gitignore riêng của từng framework).
+# ═══════════════════════════════════════════════════════════════
+
+# Secrets — không bao giờ commit dù ở bất kỳ đâu trong repo
+.env
+.env.*
+!.env.example
+!*/.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker (nếu sau này dùng lại)
+docker-compose.override.yml
+
+# Archive tạm của PROGRESS.md khi bị cắt gọn (xem quy tắc trong PROGRESS.md)
+# — vẫn commit bình thường, KHÔNG ignore, dòng này chỉ để ghi chú rõ chủ đích
+# PROGRESS_ARCHIVE.md không bị bỏ sót ngoài ý muốn.

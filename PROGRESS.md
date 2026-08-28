@@ -1,22 +1,69 @@
-# PROGRESS.md — QuoceStore — Nhật ký tiến độ
+# PROGRESS.md — QuoceStore — Trạng thái & Nhật ký
 
-> File này được AI agent tự động cập nhật sau mỗi việc hoàn thành, và bắt buộc
-> đọc lại đầu mỗi phiên làm việc mới. Xem quy tắc ghi log trong CLAUDE.md.
+> Xem `CLAUDE.md` để biết ngữ cảnh đầy đủ dự án (nguyên tắc, stack, roadmap
+> chi tiết). File này gồm 2 phần tách biệt:
+>
+> **(1) 🎯 TRẠNG THÁI HIỆN TẠI** — LUÔN LUÔN GHI ĐÈ phần này mỗi khi cập nhật
+> (không append thêm bản cũ bên dưới) — đây là nguồn duy nhất trả lời "đang ở
+> đâu, tiếp theo làm gì NGAY BÂY GIỜ" mà không cần đọc hết lịch sử bên dưới.
+>
+> **(2) 📜 NHẬT KÝ CHI TIẾT** — CHỈ được append thêm vào cuối, KHÔNG sửa/xóa
+> entry cũ — đây là lịch sử để tra cứu "việc X đã làm chưa, làm bằng cách
+> nào, gặp vấn đề gì" khi cần debug hoặc đối chiếu.
 
 ---
 
-## [Khởi tạo] Trạng thái bàn giao ban đầu
+## 🎯 TRẠNG THÁI HIỆN TẠI
+*(cập nhật lần cuối: [Khởi tạo] — 2026-08-29)*
+
+### Đang làm / Việc tiếp theo ngay
+**Chưa bắt đầu** — việc đầu tiên cần làm: **Hoàn tất Phân trang cho
+GET /products và GET /products/admin/all** (chi tiết đầy đủ trong CLAUDE.md
+mục "VIỆC CẦN LÀM TIẾP — mục 1").
+
+### Đã hoàn thành (tóm tắt — xem CLAUDE.md phần "ĐÃ HOÀN THÀNH" để biết chi
+tiết kỹ thuật từng mục)
+- ✅ Phase 0 (bảo mật khẩn cấp) — 100%
+- ✅ Phase 1 (MDM: Brand/SubCategory quan hệ thật) — 100%
+- ✅ Rate-limiting, Guest Order Lookup, đồng bộ style — 100%
+- ✅ Nhóm A (helmet, CORS, JWT cookie HttpOnly, ValidationPipe) — phần lõi 100%
+- ✅ Nhóm C (Observability: logging, health check, graceful shutdown, Sentry) — 100%
+- 🟡 Nhóm B (Sẵn sàng chịu tải): Redis cache ✅ xong, Phân trang ❌ chưa làm
+- ✅ Git + GitHub đã setup (repo private, đã push 2 commit đầu)
+
+### ⚠️ Vấn đề đang biết, CHƯA xử lý (Known Issues)
+*(danh sách này để trống lúc bàn giao — agent thêm vào đây bất kỳ vấn đề nào
+phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các phiên)*
+
+- *(chưa có mục nào)*
+
+### Quyết định đang chờ người dùng xác nhận
+- CCCD có bắt buộc thu thập không, hay nên optional? (liên quan Nhóm D)
+- Deploy ở VPS riêng hay PaaS (Vercel+Railway/Render)? (liên quan Nhóm E)
+
+---
+
+## 📏 QUY TẮC GIỮ FILE NÀY GỌN GÀNG (đọc nếu bạn là agent đang chuẩn bị ghi log)
+
+- Phần "NHẬT KÝ CHI TIẾT" bên dưới nếu vượt quá khoảng 400-500 dòng, tạo file
+  `PROGRESS_ARCHIVE.md` cùng thư mục, cắt các entry CŨ NHẤT (giữ lại 5-10 entry
+  gần nhất trong PROGRESS.md) chuyển sang file archive đó, ghi 1 dòng ở đầu
+  phần Nhật ký: "Các entry trước [ngày] đã chuyển sang PROGRESS_ARCHIVE.md".
+  Việc này giữ file chính luôn gọn, đọc nhanh mỗi phiên.
+- KHÔNG BAO GIỜ xóa hẳn thông tin — chỉ di chuyển sang file archive, không mất
+  dữ liệu lịch sử.
+
+---
+
+## 📜 NHẬT KÝ CHI TIẾT
+*(append-only, KHÔNG sửa/xóa entry cũ — entry mới nhất ở CUỐI file)*
+
+### [Khởi tạo] Trạng thái bàn giao ban đầu
 
 Dự án được bàn giao ở trạng thái: Phase 0 ✅, Phase 1 ✅, Nhóm A ✅ (phần lõi),
 Nhóm C ✅, Nhóm B đang dở (Cache Redis ✅, Phân trang ❌).
 
-Việc tiếp theo cần làm ngay: **Hoàn tất Phân trang cho GET /products và
-GET /products/admin/all** — xem chi tiết đầy đủ trong CLAUDE.md mục
-"VIỆC CẦN LÀM TIẾP — mục 1".
-
----
-
-## [Sau khởi tạo] Đã hoàn thành: Thiết lập Git + GitHub
+### [Sau khởi tạo] Đã hoàn thành: Thiết lập Git + GitHub
 
 - **File đã sửa/tạo**:
   - Khởi tạo Git repo tại thư mục gốc `D:\Projects\quoce_store`
@@ -53,5 +100,6 @@ GET /products/admin/all** — xem chi tiết đầy đủ trong CLAUDE.md mục
 
 ---
 
-(Các mục log tiếp theo sẽ được agent tự thêm vào bên dưới dòng này, bắt đầu
-từ việc "Hoàn tất Nhóm B — Phân trang".)
+*(Entry tiếp theo sẽ được agent tự thêm vào NGAY DƯỚI dòng này, bắt đầu từ
+việc "Hoàn tất Nhóm B — Phân trang". Nhớ: mỗi entry mới PHẢI đi kèm cập nhật
+lại phần "🎯 TRẠNG THÁI HIỆN TẠI" ở đầu file.)*
