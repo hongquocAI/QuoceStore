@@ -17,14 +17,15 @@
 *(cập nhật lần cuối: 2026-08-29)*
 
 ### Đang làm / Việc tiếp theo ngay
-**✅ Nhóm B ĐÃ HOÀN TẤT** (code xong, backend đã verify bằng request thật,
-frontend đã pass `tsc --noEmit` + biên dịch sạch cả 3 trang).
+**➡️ ĐANG BẮT ĐẦU: Nhóm F — nối Discount thật vào `OrdersService.create()`**
+(CLAUDE.md mục "VIỆC CẦN LÀM TIẾP — mục 2"). Đây là logic tính tiền
+server-side trong transaction → làm trên `/model opusplan`.
 
-⏳ **CÒN CHỜ NGƯỜI DÙNG KIỂM TRA TAY 1 lượt trang `/admin/products`** trước khi
-coi là đóng hoàn toàn — xem mục "Cần người dùng kiểm tra" bên dưới.
+**✅ Nhóm B ĐÃ HOÀN TẤT** (backend verify bằng request thật, frontend pass
+`tsc --noEmit`, người dùng đã test tay trang Admin).
 
-**Việc tiếp theo sau đó**: Nhóm F — nối Discount thật vào
-`OrdersService.create()` (CLAUDE.md mục "VIỆC CẦN LÀM TIẾP — mục 2").
+**✅ Bug PATCH variants ĐÃ ĐÓNG** — người dùng test PASS cả 3 bước
+2026-08-29 (xem Nhật ký chi tiết).
 
 **Phạm vi đã được người dùng chốt (2026-08-29):**
 - Backend: phân trang + lọc server-side đầy đủ (`page`, `limit`,
@@ -67,12 +68,9 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 
 - ✅ ~~Sản phẩm test sót trong DB~~ — **ĐÃ XỬ LÝ 2026-08-29**: xóa sạch 6 đơn
   test + 6 orderItem + sản phẩm test, có lưu vết đầy đủ trong Nhật ký chi tiết.
-- 🟡 **Sản phẩm thật duy nhất đang bị ẩn** (`isActive = false`) → storefront
-  không hiển thị sản phẩm nào, `GET /products` trả `total=0`.
-  **Nguyên nhân thật đã tìm ra** (khác hẳn phỏng đoán ban đầu là "bấm nhầm nút
-  Xóa"): `PATCH /products/:id` trả 400 nên **không thể lưu lại** `isActive`
-  = true qua Admin UI — xem entry bug trong Nhật ký chi tiết. Bug đã sửa;
-  chỉ còn chờ bật lại cờ này qua UI để đóng hoàn toàn.
+- ✅ ~~Sản phẩm thật bị ẩn / bug PATCH variants~~ — **ĐÃ ĐÓNG HOÀN TOÀN
+  2026-08-29**, người dùng đã test tay PASS cả 3 bước. Xem entry trong Nhật ký
+  chi tiết.
 - **Storefront chưa phân trang server-side** — cố ý hoãn, lý do đầy đủ ghi ở
   mục "Đang làm" phía trên. Điều kiện tiên quyết: thêm `minPrice`/`maxPrice`
   vào `QueryProductDto`.
@@ -83,14 +81,7 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 
 ### 🔍 Cần người dùng kiểm tra (chưa tự verify được trong phiên này)
 
-**ƯU TIÊN 1 — xác minh bản sửa bug PATCH variants (2026-08-29):**
-1. Mở `/admin/products` → Sửa sản phẩm Baseus → tick **"Đang bán"** → Lưu.
-   Phải **thành công**, không còn 400 `variants.0.property id should not exist`.
-2. Gọi `GET /products` → phải trả `total = 1`; mở trang chủ `/` phải thấy lại
-   sản phẩm.
-3. Sửa **giá hoặc tồn kho của 1 màu** của Baseus → Lưu → **F5 lại trang** →
-   xác nhận giá/tồn kho mới **thực sự đã lưu** (trước khi sửa, đây là ca
-   "báo thành công giả": UI báo OK nhưng DB không đổi gì).
+*(Bug PATCH variants: đã test PASS 2026-08-29, không còn nợ gì.)*
 
 **Các mục còn lại (từ Nhóm B):**
 Backend đã được verify đầy đủ bằng request thật (xem nhật ký chi tiết). Phần
@@ -361,10 +352,14 @@ variants đàng hoàng, chỉ `update()` bỏ sót.)
   sử đơn hàng cũ → không cần logic upsert so khớp từng variant cho phức tạp.
 
 - **Đã test**: `npx tsc --noEmit` cả backend và frontend → **0 lỗi**.
-  ⚠️ **CHƯA tự chạy được kịch bản UI** (cần login ADMIN, agent không có
-  credential) — xem mục "🔍 Cần người dùng kiểm tra" ở phần Trạng thái.
   Cố ý **KHÔNG** tự bật `isActive = true` bằng lệnh ghi thẳng vào DB, vì làm
   vậy sẽ che mất chính phép thử cần chạy (lưu qua UI phải thành công).
+- **✅ NGƯỜI DÙNG ĐÃ TEST TAY — PASS HOÀN TOÀN (2026-08-29), BUG ĐÓNG:**
+  1. Sửa Baseus → tick "Đang bán" → Lưu: **thành công**, hết lỗi 400.
+  2. `GET /products` → `total = 1`, Baseus hiện lại trên trang chủ.
+  3. Sửa giá màu Đen 429.000 → 450.000 → Lưu → F5 → mở lại form Sửa: giá hiện
+     đúng **450.000** (giá mới). Xác nhận bug "báo thành công giả" đã hết —
+     tức nhánh xóa-rồi-tạo-lại variants trong `update()` chạy đúng thật.
 
 ---
 
