@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, HttpException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { DiscountsService } from '../discounts/discounts.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { LookupOrderDto } from './dto/lookup-order.dto';
 
@@ -7,7 +8,10 @@ import { LookupOrderDto } from './dto/lookup-order.dto';
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private discountsService: DiscountsService,
+  ) {}
 
   async create(createOrderDto: CreateOrderDto) {
     let targetUserId = createOrderDto.userId;
@@ -122,6 +126,44 @@ export class OrdersService {
           }
         }
 
+        // 🛡️ Nhóm F: mã giảm giá — SERVER tự validate + tự tính số tiền
+        // giảm, KHÔNG bao giờ tin % hay số tiền giảm từ client (nguyên tắc
+        // cốt lõi của dự án, giống hệt cách totalAmount luôn tự tính lại).
+        let discountAmount = 0;
+        let appliedDiscountCode: string | null = null;
+
+        if (createOrderDto.discountCode?.trim()) {
+          // Gọi lại ĐÚNG hàm validate của DiscountsController, truyền `tx`
+          // vào để đọc trong cùng transaction với phần tăng usedCount bên
+          // dưới — tránh viết lại logic validate 1 lần nữa ở đây.
+          const discount = await this.discountsService.validateCode(createOrderDto.discountCode, tx);
+
+          // Chống race: tăng usedCount CÓ ĐIỀU KIỆN ngay trong transaction.
+          // Nếu maxUsage vừa đầy giữa lúc validate ở trên và lúc increment
+          // này (2 đơn cùng lúc tranh nốt lượt cuối), updateMany trả
+          // count=0 -> từ chối rõ ràng thay vì cho lọt qua vượt maxUsage.
+          const inc = await tx.discount.updateMany({
+            where: {
+              id: discount.id,
+              ...(discount.maxUsage !== null && { usedCount: { lt: discount.maxUsage } }),
+            },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (inc.count === 0) {
+            throw new BadRequestException(
+              'Mã giảm giá vừa hết lượt sử dụng, vui lòng bỏ mã và thử lại.',
+            );
+          }
+
+          // percentage lưu dạng thập phân (0.1 = 10%) — đã xác nhận qua dữ
+          // liệu thật trong DB và cách frontend cart/page.tsx đang dùng.
+          discountAmount = Math.round(computedTotalAmount * discount.percentage);
+          discountAmount = Math.min(discountAmount, computedTotalAmount); // không cho tổng âm
+          appliedDiscountCode = discount.code;
+        }
+
+        const finalTotalAmount = computedTotalAmount - discountAmount;
+
         const newOrder = await tx.order.create({
           data: {
             userId: targetUserId!,
@@ -130,7 +172,9 @@ export class OrdersService {
             customerEmail: createOrderDto.customerEmail || null,
             address: createOrderDto.address,
             paymentMethod: createOrderDto.paymentMethod || 'COD',
-            totalAmount: computedTotalAmount,
+            totalAmount: finalTotalAmount,
+            discountCode: appliedDiscountCode,
+            discountAmount,
             paymentStatus: 'PENDING',
             shippingStatus: 'PENDING',
             orderItems: { create: orderItemsData },
@@ -149,6 +193,7 @@ export class OrdersService {
         data: {
           ...order,
           totalAmount: Number(order.totalAmount),
+          discountAmount: Number(order.discountAmount),
           orderItems: order.orderItems.map((item) => ({
             ...item,
             priceAtPurchase: Number(item.priceAtPurchase),
@@ -156,7 +201,14 @@ export class OrdersService {
         },
       };
     } catch (error: any) {
-      if (error instanceof BadRequestException) {
+      // 🛡️ Nhóm F: BUG đã phát hiện khi nối Discount vào đây — trước đây
+      // chỉ re-throw BadRequestException. DiscountsService.validateCode()
+      // throw NotFoundException (dùng cho cả 3 ca: mã không tồn tại/hết
+      // hạn/hết lượt) -> nếu không mở rộng điều kiện này, message thật bị
+      // NUỐT và thay bằng thông báo chung chung bên dưới, khách không biết
+      // vì sao đơn thất bại. Dùng HttpException để bao mọi lỗi HTTP có chủ
+      // đích (400/404/...) mà không phải liệt kê từng loại.
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error('Lỗi hệ thống khi tạo đơn hàng', error?.stack || error);

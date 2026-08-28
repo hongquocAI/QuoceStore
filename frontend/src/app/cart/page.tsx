@@ -183,10 +183,20 @@ const handleApplyCoupon = async () => {
                 </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => {
-                  sessionStorage.setItem('appliedDiscount', String(discount));
-                  sessionStorage.setItem('finalTotal', String(finalTotal));
+                  // ⚡ Nhóm F: trước đây chỉ lưu % và tổng tiền đã tính sẵn ở
+                  // đây — nhưng KHÔNG lưu mã code, và trang checkout không hề
+                  // đọc lại 2 key này -> mã giảm giá bị rơi mất hoàn toàn
+                  // trước khi tới POST /orders (server không hề biết có mã).
+                  // Nay lưu thêm CHÍNH MÃ CODE để checkout gửi lên server —
+                  // server sẽ tự validate + tự tính lại số tiền giảm, không
+                  // tin percentage/finalTotal đã tính sẵn ở đây.
+                  if (discount > 0 && appliedCodeName) {
+                    sessionStorage.setItem('discountCode', appliedCodeName);
+                  } else {
+                    sessionStorage.removeItem('discountCode'); // tránh sót mã cũ từ lần trước
+                  }
                   router.push('/checkout');
                 }}
                 className="w-full bg-black text-white py-4 rounded-2xl uppercase tracking-[0.2em] text-xs font-semibold hover:bg-gray-800 transition shadow-lg shadow-black/10 text-center block"

@@ -7,5 +7,8 @@ import { PrismaModule } from '../prisma/prisma.module'; // Đảm bảo đườn
   imports: [PrismaModule],
   controllers: [DiscountsController],
   providers: [DiscountsService],
+  // ⚡ Nhóm F: export để OrdersModule import và inject DiscountsService vào
+  // OrdersService (nối Discount thật vào OrdersService.create()).
+  exports: [DiscountsService],
 })
 export class DiscountsModule {}

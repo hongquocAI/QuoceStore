@@ -64,4 +64,12 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CartItemDto)
   cart: CartItemDto[];
+
+  // ⚡ Nhóm F: mã giảm giá optional. Server LUÔN tự validate qua
+  // DiscountsService.validateCode() và tự tính lại số tiền giảm — client chỉ
+  // được gửi MÃ, không bao giờ gửi kèm % giảm hay số tiền đã giảm (không có
+  // field nào cho việc đó ở đây, và whitelist:true sẽ loại bỏ nếu cố gửi).
+  @IsOptional()
+  @IsString()
+  discountCode?: string;
 }

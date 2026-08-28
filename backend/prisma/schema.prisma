@@ -188,6 +188,12 @@ model Order {
   paymentMethod  String         @default("COD")
 
   totalAmount    Decimal        @db.Decimal(12, 2)
+  // ⚡ Nhóm F: snapshot mã giảm giá đã áp dụng tại thời điểm đặt hàng (nếu
+  // có). discountAmount là số tiền ĐÃ được trừ vào totalAmount ở trên
+  // (totalAmount đã là giá SAU giảm) — lưu riêng để hiển thị lại đúng dòng
+  // "Giảm giá" trên hóa đơn/lịch sử đơn hàng mà không cần tính lại.
+  discountCode   String?
+  discountAmount Decimal        @default(0) @db.Decimal(12, 2)
   paymentStatus  PaymentStatus  @default(PENDING)
   shippingStatus ShippingStatus @default(PENDING)
   qrCodeUrl      String?

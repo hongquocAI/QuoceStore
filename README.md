@@ -7,7 +7,7 @@ depth), khả năng mở rộng, và khả năng quan sát hệ thống (observa
 ## Tính năng chính
 
 - **Storefront**: duyệt sản phẩm theo danh mục/thương hiệu, biến thể màu sắc,
-  giỏ hàng, thanh toán COD hoặc chuyển khoản VietQR (PayOS)
+  giỏ hàng, mã giảm giá, thanh toán COD hoặc chuyển khoản VietQR (PayOS)
 - **Guest checkout**: đặt hàng không cần tài khoản, tra cứu lại đơn hàng bằng
   mã đơn + số điện thoại
 - **Quản trị (Admin)**: CRUD sản phẩm với biến thể, quản lý danh mục/thương

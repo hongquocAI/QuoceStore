@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart, getCartLineId } from '@/context/CartContext';
@@ -28,6 +28,46 @@ export default function CheckoutPage() {
   const [qrLoading, setQrLoading] = useState(false);
 
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+  // ⚡ Nhóm F: mã giảm giá mang từ trang giỏ hàng sang qua sessionStorage
+  // (key `discountCode`, xem cart/page.tsx). Server LUÔN là nguồn sự thật
+  // cuối cùng — % hiển thị ở đây chỉ để khách xem trước, không được dùng để
+  // tính số tiền gửi lên server (server tự tính lại toàn bộ trong transaction).
+  const [discountCode, setDiscountCode] = useState<string | null>(null);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [discountNote, setDiscountNote] = useState('');
+
+  useEffect(() => {
+    const savedCode = sessionStorage.getItem('discountCode');
+    if (!savedCode) return;
+
+    // Re-validate lại ngay khi vào trang checkout — mã có thể đã hết hạn
+    // hoặc hết lượt trong lúc khách còn đang điền form ở trang giỏ hàng.
+    // Không tin lại % đã tính từ trang giỏ hàng.
+    api
+      .get(`/discounts/code/${savedCode}`)
+      .then((res) => {
+        const discountObj = res.data.data || res.data;
+        if (discountObj?.isActive) {
+          setDiscountCode(discountObj.code);
+          setDiscountPercentage(Number(discountObj.percentage));
+        } else {
+          sessionStorage.removeItem('discountCode');
+          setDiscountNote('Mã giảm giá không còn hiệu lực, đơn hàng sẽ tính theo giá gốc.');
+        }
+      })
+      .catch(() => {
+        // Mã không tồn tại/hết hạn/hết lượt -> KHÔNG chặn thanh toán, chỉ
+        // báo nhẹ và tiếp tục với giá gốc (đúng hành vi server sẽ áp dụng
+        // nếu lỡ vẫn gửi mã: BadRequestException nếu mã sai, nhưng ở đây ta
+        // chủ động bỏ mã trước để tránh khách bị chặn đặt hàng vô lý).
+        sessionStorage.removeItem('discountCode');
+        setDiscountNote('Mã giảm giá không còn hiệu lực, đơn hàng sẽ tính theo giá gốc.');
+      });
+  }, []);
+
+  const discountAmountPreview = Math.round(subtotal * discountPercentage);
+  const totalPreview = subtotal - discountAmountPreview;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,12 +99,16 @@ export default function CheckoutPage() {
           variantId: item.variantId,
           quantity: item.quantity,
         })),
+        // ⚡ Nhóm F: chỉ gửi MÃ, không gửi percentage/số tiền đã giảm — server
+        // tự validate lại mã và tự tính số tiền giảm trong OrdersService.
+        ...(discountCode && { discountCode }),
       };
 
       const res = await api.post('/orders', payload);
       const order = res.data.data;
       setOrderResult(order);
       clearCart();
+      sessionStorage.removeItem('discountCode');
 
       // Nếu chọn chuyển khoản VietQR, tạo QR ngay sau khi đơn hàng được tạo
       if (paymentMethod === 'BANK_TRANSFER') {
@@ -108,6 +152,18 @@ export default function CheckoutPage() {
           </p>
 
           <div className="text-left bg-[#fafafc] rounded-2xl p-5 mb-6 space-y-2 text-sm">
+            {/* ⚡ Nhóm F: dùng orderResult.discountAmount TỪ SERVER — nguồn
+                sự thật cuối cùng, không phải giá trị preview tính ở client. */}
+            {Number(orderResult.discountAmount) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Giảm giá {orderResult.discountCode ? `(${orderResult.discountCode})` : ''}</span>
+                <span className="font-medium text-emerald-600">
+                  -{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+                    Number(orderResult.discountAmount),
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-500">Tổng tiền</span>
               <span className="font-semibold text-gray-900">
@@ -316,10 +372,36 @@ export default function CheckoutPage() {
                 })}
               </div>
 
-              <div className="border-t border-gray-100 pt-4 flex justify-between font-semibold text-gray-900">
+              <div className="border-t border-gray-100 pt-4 flex justify-between text-gray-600">
                 <span>Tạm tính</span>
-                <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(subtotal)}</span>
+                <span className="font-medium text-gray-900">
+                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(subtotal)}
+                </span>
               </div>
+
+              {/* ⚡ Nhóm F: chỉ là PREVIEW cho khách xem trước — số tiền thật
+                  sự áp dụng luôn do server tự tính lại khi tạo đơn. */}
+              {discountCode && discountAmountPreview > 0 && (
+                <div className="flex justify-between text-emerald-600 mt-2">
+                  <span>Giảm giá ({discountCode})</span>
+                  <span>
+                    -{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(discountAmountPreview)}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between font-semibold text-gray-900 mt-2 pt-2 border-t border-gray-50">
+                <span>Tổng cộng</span>
+                <span>
+                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+                    discountCode ? totalPreview : subtotal,
+                  )}
+                </span>
+              </div>
+
+              {discountNote && (
+                <p className="text-[11px] text-amber-600 mt-2">{discountNote}</p>
+              )}
               <p className="text-[11px] text-gray-400 mt-2">
                 * Tổng tiền cuối cùng sẽ được hệ thống xác nhận lại sau khi đặt hàng.
               </p>

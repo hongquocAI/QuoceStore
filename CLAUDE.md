@@ -212,6 +212,43 @@ gửi có phần tử → thay thế toàn bộ.
     định và `search` hiện quét tuần tự. Chưa ảnh hưởng ở quy mô hiện tại,
     nhưng là việc cần làm khi catalog lớn
 
+### Nhóm F (phần 1) — Discount thật trong OrdersService.create() (100% XONG)
+- Schema: thêm `Order.discountCode String?` (snapshot mã) và
+  `Order.discountAmount Decimal @default(0)` — migration
+  `add_discount_to_order`, chỉ THÊM cột, an toàn
+- `DiscountsService.validateCode(code, client?)` nay nhận thêm tham số
+  `client` tùy chọn (mặc định `this.prisma`) để `OrdersService.create()` gọi
+  lại đúng hàm này TRONG transaction tạo đơn (truyền `tx` vào) — không viết
+  lại logic validate ở nơi khác. `DiscountsModule` đã `exports:
+  [DiscountsService]`, `OrdersModule` đã import `DiscountsModule`
+- `CreateOrderDto.discountCode?` optional. Trong transaction: validate mã →
+  tăng `usedCount` CÓ ĐIỀU KIỆN bằng `updateMany({ where: { usedCount: {
+  lt: maxUsage } } })` để chống race 2 đơn cùng tranh lượt cuối (nếu
+  `count === 0` thì từ chối rõ ràng) → tính `discountAmount = round(
+  computedTotalAmount * discount.percentage)` → `totalAmount` cuối = tổng
+  gốc trừ discountAmount. Toàn bộ nằm trong transaction hiện có, rollback
+  cùng nhau nếu bất kỳ bước nào lỗi (đã verify: mã sai → 404, tồn kho KHÔNG
+  bị trừ oan)
+  - ⚠️ **`Discount.percentage` lưu dạng THẬP PHÂN** (0.1 = 10%, KHÔNG phải
+    10) — đã xác nhận qua dữ liệu thật trong DB (`QUOCE10` → `0.1`) và cách
+    `cart/page.tsx` dùng trực tiếp làm hệ số nhân. Nếu sau này thêm màn
+    Admin tạo Discount, PHẢI giữ đúng quy ước này (nhập "10%" → lưu `0.1`),
+    không đổi lại thành số nguyên
+- 🛡️ BUG đã sửa cùng lúc: khối `catch` cuối `OrdersService.create()` trước
+  đây chỉ re-throw `BadRequestException`, nuốt mất `NotFoundException` mà
+  `validateCode()` throw (mã hết hạn/hết lượt/không tồn tại) và thay bằng
+  thông báo chung chung. Đã đổi điều kiện sang `error instanceof
+  HttpException` để bao hết mọi lỗi HTTP có chủ đích
+- Frontend: mã giảm giá bị RƠI MẤT trước khi tới server (bug có từ trước —
+  `cart/page.tsx` chỉ lưu % và tổng tiền đã tính sẵn vào sessionStorage,
+  KHÔNG lưu mã code, và `checkout/page.tsx` không đọc lại gì cả). Đã nối lại:
+  cart lưu `discountCode` vào sessionStorage → checkout đọc lại, RE-VALIDATE
+  qua `GET /discounts/code/:code` (không tin % cũ vì mã có thể hết hạn giữa
+  2 bước), hiển thị preview "Giảm giá" + "Tổng cộng", gửi `discountCode` (chỉ
+  mã, không gửi % hay số tiền) trong `POST /orders`. Server luôn là nguồn sự
+  thật cuối cùng — màn hình kết quả sau khi đặt hàng dùng
+  `orderResult.discountAmount` từ response, không dùng số preview client tính
+
 ### Hạ tầng quản lý mã nguồn (MỚI)
 - Git repo đã khởi tạo tại thư mục gốc D:\Projects\quoce_store (KHÔNG phải
   trong backend/ hay frontend/ riêng lẻ — 2 thư mục con từng có .git riêng do
@@ -234,10 +271,8 @@ có chủ ý (KHÔNG phải bỏ sót): phân trang server-side cho storefront, 
 sau khi đã thêm `minPrice`/`maxPrice` vào `QueryProductDto`.
 
 ### 2. Nhóm F — Hoàn thiện nghiệp vụ còn dang dở
-- Nối Discount thật vào OrdersService.create(): nhận discountCode optional
-  trong CreateOrderDto, validate qua DiscountsService.validateCode(), trừ vào
-  totalAmount SERVER-SIDE (không tin % giảm giá gửi từ client), tăng
-  usedCount trong cùng transaction với tạo Order
+- ✅ ĐÃ XONG — Nối Discount thật vào OrdersService.create(). Xem mô tả chi
+  tiết ở mục "ĐÃ HOÀN THÀNH" phía trên (sẽ thêm ngay dưới đây).
 - Dùng bảng AuditLog (đã có trong schema, chưa từng ghi gì): tạo 1
   AuditLogInterceptor hoặc ghi thủ công trong các action nhạy cảm (Admin
   xóa/sửa Product, đổi trạng thái Order, xóa User...) — ghi userId, action,

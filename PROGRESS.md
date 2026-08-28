@@ -17,9 +17,15 @@
 *(cập nhật lần cuối: 2026-08-29)*
 
 ### Đang làm / Việc tiếp theo ngay
-**➡️ ĐANG BẮT ĐẦU: Nhóm F — nối Discount thật vào `OrdersService.create()`**
-(CLAUDE.md mục "VIỆC CẦN LÀM TIẾP — mục 2"). Đây là logic tính tiền
-server-side trong transaction → làm trên `/model opusplan`.
+**✅ Nhóm F (phần 1) — Discount thật vào `OrdersService.create()` ĐÃ XONG**
+(code + verify bằng request thật, dữ liệu test đã dọn sạch). Việc tiếp theo
+trong Nhóm F: bảng AuditLog, trang quản lý đơn hàng Admin, cảnh báo tồn kho
+thấp (CLAUDE.md mục "VIỆC CẦN LÀM TIẾP — mục 2").
+
+⏳ **CÒN CHỜ NGƯỜI DÙNG KIỂM TRA TAY luồng checkout có mã giảm giá** — xem
+mục "🔍 Cần người dùng kiểm tra" bên dưới. Backend đã verify đầy đủ bằng
+PowerShell, nhưng phần UI (áp mã ở giỏ hàng → sang checkout → đặt hàng) chưa
+tự bấm qua được.
 
 **✅ Nhóm B ĐÃ HOÀN TẤT** (backend verify bằng request thật, frontend pass
 `tsc --noEmit`, người dùng đã test tay trang Admin).
@@ -82,6 +88,19 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 ### 🔍 Cần người dùng kiểm tra (chưa tự verify được trong phiên này)
 
 *(Bug PATCH variants: đã test PASS 2026-08-29, không còn nợ gì.)*
+
+**ƯU TIÊN 1 — luồng checkout có mã giảm giá (Nhóm F, 2026-08-29):**
+1. Vào `/cart`, thêm 1-2 sản phẩm, nhập mã `QUOCE10` → bấm "Áp dụng" → thấy
+   dòng "Giảm giá" + "Tổng cộng" đúng 10%.
+2. Bấm "Tiến hành thanh toán" → sang `/checkout` → PHẢI thấy lại đúng dòng
+   "Giảm giá (QUOCE10)" + "Tổng cộng" ở khối tóm tắt (đây chính là chỗ trước
+   đây bị RƠI MẤT — mã không hề tới được trang checkout).
+3. Điền form, đặt hàng (COD) → màn hình "Đặt hàng thành công" phải hiện đúng
+   dòng "Giảm giá (QUOCE10)" và "Tổng tiền" đã trừ đúng 10%.
+4. Vào `/orders` (lịch sử đơn) xác nhận đơn vừa tạo có `totalAmount` đúng
+   (đã trừ giảm giá).
+5. (Tùy chọn) Test ca lỗi: sửa tay 1 mã sai trong ô nhập ở giỏ hàng → phải
+   báo "không hợp lệ", không chặn được thanh toán với giá gốc nếu bỏ qua mã.
 
 **Các mục còn lại (từ Nhóm B):**
 Backend đã được verify đầy đủ bằng request thật (xem nhật ký chi tiết). Phần
@@ -306,6 +325,20 @@ thường của Postgres, không phải lỗi.
 - Toàn bộ script tạm (`tmp-inspect.js`, `tmp-dump.js`, `tmp-cleanup.js`,
   `tmp-check.js`) đã xóa khỏi `backend/`, `git status` sạch.
 
+⚠️ **PHÁT HIỆN NGOÀI DỰ KIẾN trong lúc xác minh** *(ghi lúc chưa tìm ra
+nguyên nhân thật — xem entry ngay bên dưới để biết kết luận cuối cùng)*: sản
+phẩm thật còn lại đang có `isActive = false`, nên `GET /products` trả
+`total=0` và **storefront hiện không hiển thị sản phẩm nào**. Bằng chứng:
+`updatedAt` của sản phẩm này là 2026-08-28T21:12:01Z, tức bị sửa ~10 phút
+TRƯỚC thời điểm chạy script dọn dẹp — và script dọn dẹp chỉ `deleteMany` trên
+Order + `delete` đúng 1 sản phẩm test theo id, KHÔNG hề ghi vào `isActive`
+của sản phẩm này. Nguyên nhân nhiều khả năng nhất: có người bấm nút "Xóa"
+trên sản phẩm này trong trang Admin — lúc đó nó vẫn còn 1 orderItem (thuộc
+đơn số 4) nên `ProductService.remove()` đi vào nhánh **soft-delete**
+(`isActive: false`) thay vì xóa cứng. Đây là hành vi ĐÚNG của service, không
+phải bug. Đang chờ người dùng xác nhận có bật lại `isActive = true` hay
+không.
+
 ### [2026-08-29] Đã sửa BUG: PATCH /products/:id trả 400 + variants không được lưu
 
 **Triệu chứng**: sửa sản phẩm có biến thể màu qua Admin UI → 400
@@ -363,16 +396,96 @@ variants đàng hoàng, chỉ `update()` bỏ sót.)
 
 ---
 
-⚠️ **PHÁT HIỆN NGOÀI DỰ KIẾN trong lúc xác minh** *(ghi lúc chưa tìm ra
-nguyên nhân thật — xem entry ngay bên trên để biết kết luận cuối cùng)*:
-sản phẩm thật còn lại đang
-có `isActive = false`, nên `GET /products` trả `total=0` và **storefront hiện
-không hiển thị sản phẩm nào**. Bằng chứng: `updatedAt` của sản phẩm này là
-2026-08-28T21:12:01Z, tức bị sửa ~10 phút TRƯỚC thời điểm chạy script dọn dẹp
-— và script dọn dẹp chỉ `deleteMany` trên Order + `delete` đúng 1 sản phẩm
-test theo id, KHÔNG hề ghi vào `isActive` của sản phẩm này. Nguyên nhân nhiều
-khả năng nhất: có người bấm nút "Xóa" trên sản phẩm này trong trang Admin —
-lúc đó nó vẫn còn 1 orderItem (thuộc đơn số 4) nên `ProductService.remove()`
-đi vào nhánh **soft-delete** (`isActive: false`) thay vì xóa cứng. Đây là
-hành vi ĐÚNG của service, không phải bug. Đang chờ người dùng xác nhận có bật
-lại `isActive = true` hay không.
+### [2026-08-29] Đã hoàn thành: Nhóm F (phần 1) — Discount thật vào OrdersService.create()
+
+Làm trên `/model opusplan` (yêu cầu người dùng, vì đây là logic tính tiền
+server-side trong transaction). Đã vào Plan Mode trước khi code, dùng 2 agent
+Explore song song khảo sát backend (Discount/Orders) và frontend (checkout)
+trước khi thiết kế.
+
+**Phát hiện quan trọng trước khi code**: trang giỏ hàng (`cart/page.tsx`) đã
+có sẵn UI mã giảm giá hoàn chỉnh (ô nhập, gọi `GET /discounts/code/:code`,
+hiển thị giảm giá), nhưng mã bị **RƠI MẤT hoàn toàn** trước khi tới
+`POST /orders` — trang chỉ lưu `percentage` + `finalTotal` đã tính sẵn vào
+`sessionStorage`, KHÔNG lưu mã code, và trang checkout không đọc lại bất kỳ
+key nào. Đây là bug có từ trước, không phải do phiên này gây ra. Việc chính
+là NỐI LẠI mạch có sẵn, không phải xây UI mới.
+
+**Đã xác nhận trước khi code (theo yêu cầu người dùng)**: `Discount.percentage`
+lưu dạng THẬP PHÂN (0.1 = 10%), qua 2 bằng chứng độc lập — dữ liệu thật
+trong DB (`QUOCE10` → `0.1`) và cách `cart/page.tsx` dùng trực tiếp làm hệ số
+nhân (`subtotal * discount`, không chia 100).
+
+- **File đã sửa/tạo**:
+  - `backend/prisma/schema.prisma` — thêm `Order.discountCode String?` và
+    `Order.discountAmount Decimal @default(0)`. Migration
+    `20260828221446_add_discount_to_order` — chỉ `ADD COLUMN`, không xóa gì,
+    an toàn tuyệt đối.
+  - `backend/src/discounts/discounts.service.ts` — `validateCode()` thêm
+    tham số `client` tùy chọn (mặc định `this.prisma`) để tái dùng được
+    trong transaction của `OrdersService` (truyền `tx` vào), tránh viết lại
+    logic validate 2 nơi.
+  - `backend/src/discounts/discounts.module.ts` — thêm
+    `exports: [DiscountsService]` (trước đây không export gì, không
+    inject được từ module khác).
+  - `backend/src/orders/orders.module.ts` — import `DiscountsModule`.
+  - `backend/src/orders/dto/create-order.dto.ts` — thêm `discountCode?`
+    optional.
+  - `backend/src/orders/orders.service.ts` — trong transaction `create()`,
+    sau khi tính `computedTotalAmount` từ cart (không đổi logic loop cũ):
+    validate mã (nếu có) → tăng `usedCount` CÓ ĐIỀU KIỆN bằng
+    `tx.discount.updateMany({ where: { usedCount: { lt: maxUsage } } })` để
+    chống race 2 đơn tranh nốt lượt cuối (nếu `count === 0` → từ chối rõ
+    ràng) → `discountAmount = Math.round(computedTotalAmount * percentage)`
+    → `totalAmount` cuối = tổng gốc trừ discountAmount.
+    🛡️ **Bug phát hiện + sửa cùng lúc**: khối `catch` cuối `create()` trước
+    đây chỉ re-throw `BadRequestException`, sẽ NUỐT MẤT `NotFoundException`
+    mà `validateCode()` throw (dùng cho cả 3 ca mã sai/hết hạn/hết lượt) và
+    thay bằng thông báo chung chung — khách không biết vì sao đơn thất bại.
+    Đã đổi điều kiện sang `error instanceof HttpException`.
+  - `frontend/src/app/cart/page.tsx` — nút "Tiến hành thanh toán" nay ghi
+    `sessionStorage.setItem('discountCode', appliedCodeName)` thay vì chỉ
+    ghi % và tổng tiền đã tính sẵn (2 key cũ không còn dùng để truyền dữ liệu
+    sang checkout, đã bỏ).
+  - `frontend/src/app/checkout/page.tsx` — đọc `discountCode` từ
+    sessionStorage lúc mount, RE-VALIDATE qua `GET /discounts/code/:code`
+    (không tin lại % cũ vì mã có thể hết hạn giữa 2 bước — nếu không còn hợp
+    lệ thì xóa mã, báo nhẹ, KHÔNG chặn thanh toán với giá gốc); thêm dòng
+    "Giảm giá" + "Tổng cộng" vào khối tóm tắt trước khi submit (trước đây chỉ
+    có "Tạm tính"); payload `POST /orders` thêm `discountCode` (chỉ gửi mã,
+    không gửi % hay số tiền); màn hình kết quả sau khi đặt hàng hiển thị
+    `orderResult.discountAmount` từ SERVER (không dùng số preview client
+    tính) cạnh `sessionStorage.removeItem('discountCode')` khi thành công.
+
+- **Đã test**: `npx tsc --noEmit` cả backend và frontend → 0 lỗi. Backend
+  chạy thật, verify bằng `Invoke-RestMethod` với sản phẩm thật (Baseus,
+  429.000đ):
+  - `POST /orders` kèm `discountCode: "quoce10"` (chữ thường, test luôn việc
+    tự uppercase) → `totalAmount = 386100` (đúng 429.000 × 0.9),
+    `discountAmount = 42900`, `discountCode = "QUOCE10"`. `usedCount` của mã
+    tăng đúng từ 0 → 1.
+  - `discountCode` rác/không tồn tại → **404** với message thật ("Mã giảm
+    giá không tồn tại hoặc đã khóa") — xác nhận bug nuốt message ĐÃ ĐƯỢC SỬA;
+    tồn kho **không bị trừ oan** (49 → vẫn 49, không tụt thêm) → transaction
+    rollback đúng, không tạo đơn dở dang.
+  - Hạ tạm `maxUsage=1` (mã đã dùng 1 lần) → gọi lại → **404** "Mã giảm giá
+    đã hết lượt sử dụng", đơn không được tạo. Khôi phục `maxUsage=10` ngay
+    sau đó.
+  - `POST /orders` không kèm `discountCode` → `discountAmount = 0`,
+    `totalAmount` đầy đủ — không hồi quy so với hành vi cũ.
+  - Dọn sạch: xóa 2 đơn test tạo ra trong lúc verify, hoàn trả đúng 2 đơn vị
+    tồn kho đã trừ, reset `usedCount` của `QUOCE10` về lại `0`. Đã xác nhận
+    lại: `Order.count() = 0`, `stock = 50` (về đúng như trước khi test).
+
+- **Lưu ý/vấn đề gặp phải**:
+  - `npx prisma migrate dev` lần đầu báo lỗi `EPERM` khi generate Prisma
+    Client (do backend `start:dev` đang giữ file `query_engine-windows.dll.node`).
+    Migration DB đã áp dụng thành công trước khi lỗi này xảy ra (chỉ bước
+    generate client bị lỗi); chạy lại riêng `npx prisma generate` là xong,
+    không ảnh hưởng gì tới migration đã chạy.
+  - **CHƯA tự bấm qua được luồng UI** (giỏ hàng áp mã → checkout → đặt hàng)
+    — cần trình duyệt thật, phiên này không có công cụ điều khiển trình
+    duyệt. Danh sách 5 điểm cần kiểm tra tay đã ghi ở mục "🔍 Cần người dùng
+    kiểm tra" phần Trạng thái hiện tại.
+  - Mã `QUOCE10` vẫn còn nguyên trong DB (không xóa) — đây là dữ liệu hữu ích
+    để người dùng tự test UI, không phải rác cần dọn.
