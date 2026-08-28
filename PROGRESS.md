@@ -65,11 +65,13 @@ tiết kỹ thuật từng mục)
 *(danh sách này để trống lúc bàn giao — agent thêm vào đây bất kỳ vấn đề nào
 phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các phiên)*
 
-- **Có 1 sản phẩm test còn sót trong DB thật**: `"Test sản phẩm hợp lệ 001"`
-  (phát hiện khi gọi `GET /products` lúc verify phân trang, 2026-08-29). Bản
-  ghi này được tạo từ **phiên làm việc TRƯỚC**, không phải phiên này. Chưa xóa
-  vì xóa dữ liệu trong DB thật là thao tác không hoàn tác được — **cần người
-  dùng xác nhận** rồi mới xóa (nguyên tắc số 9 về dọn dữ liệu test).
+- ✅ ~~Sản phẩm test sót trong DB~~ — **ĐÃ XỬ LÝ 2026-08-29**: xóa sạch 6 đơn
+  test + 6 orderItem + sản phẩm test, có lưu vết đầy đủ trong Nhật ký chi tiết.
+- 🔴 **Sản phẩm thật duy nhất đang bị ẩn** (`isActive = false`) → storefront
+  không hiển thị sản phẩm nào, `GET /products` trả `total=0`. Nhiều khả năng
+  do bấm nút "Xóa" trên trang Admin khi sản phẩm còn đơn hàng tham chiếu →
+  `remove()` soft-delete đúng thiết kế. **Cần quyết định**: bật lại
+  `isActive = true`, hay cứ để ẩn.
 - **Storefront chưa phân trang server-side** — cố ý hoãn, lý do đầy đủ ghi ở
   mục "Đang làm" phía trên. Điều kiện tiên quyết: thêm `minPrice`/`maxPrice`
   vào `QueryProductDto`.
@@ -252,3 +254,63 @@ chỗ vỡ MỀM (danh sách thành rỗng, không crash) là trang chủ và
     cần người dùng xác nhận trước.
   - Phiên này **KHÔNG tạo thêm** bất kỳ bản ghi/file/code test tạm nào cần dọn
     (chỉ gọi các request GET đọc dữ liệu).
+
+### [2026-08-29] Dọn dữ liệu test trong DB — BẢN LƯU VẾT TRƯỚC KHI XÓA
+
+Người dùng đã xác nhận xóa vĩnh viễn toàn bộ dữ liệu test còn sót từ các phiên
+trước. **Lưu lại đầy đủ nội dung ở đây để còn dấu vết tra cứu về sau** — sau
+khi xóa, dữ liệu này KHÔNG khôi phục được từ đâu khác.
+
+**Đếm trước khi xóa**: Order = 6, OrderItem = 6, PaymentTransaction = 0,
+Product = 2.
+
+Toàn bộ 6 đơn đều tạo ngày **2026-08-27**, đều là đơn thử nghiệm (tên khách
+gõ bừa, SĐT lặp 0900900900, địa chỉ vô nghĩa):
+
+| orderCode | Khách | SĐT | Email | Địa chỉ | Thanh toán | Tổng tiền | paymentStatus | shippingStatus | Tài khoản đặt | Mặt hàng |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Test User | 0912345678 | — | 123 Test Street, Q1, TP.HCM | COD | 858.000 | PAID | PENDING | guest@quoce.vn | Test sản phẩm hợp lệ 001 ×2 @429.000 |
+| 2 | ádavasva | 0900900900 | abc@gmail.com | 2312 | COD | 429.000 | PENDING | PENDING | guest@quoce.vn | Test sản phẩm hợp lệ 001 ×1 @429.000 |
+| 3 | sdasda | 0900900900 | a@gmail.com | 12313asdas | COD | 429.000 | PENDING | PENDING | guest@quoce.vn | Test sản phẩm hợp lệ 001 ×1 @429.000 |
+| 4 | Test Customer | 0900900900 | customer-test@quoce.vn | 12312ASDZXD | BANK_TRANSFER | 429.000 | PENDING | PENDING | customer-test@quoce.vn | Pin sạc dự phòng Baseus Enerfill FC5 ×1 @429.000 |
+| 5 | Test Customer | 0900900900 | customer-test@quoce.vn | 12341241 | BANK_TRANSFER | 1.000 | PENDING | PENDING | customer-test@quoce.vn | Test sản phẩm hợp lệ 001 ×1 @1.000 |
+| 6 | Test Customer | 0900900900 | customer-test@quoce.vn | MNBNBNM | BANK_TRANSFER | 2.000 | PENDING | PENDING | customer-test@quoce.vn | Test sản phẩm hợp lệ 001 ×2 @1.000 |
+
+**Sản phẩm test bị xóa kèm:**
+- id `4124a26a-9609-4320-864c-02d3ddc72efd`, title `Test sản phẩm hợp lệ 001`,
+  slug `test-hop-le-001`, sku `TEST-DUP-001`, isActive `true`, tạo
+  2026-08-27T11:02:55Z, 0 biến thể, bị 5 orderItem tham chiếu.
+
+**Sản phẩm GIỮ LẠI** (dữ liệu thật, không đụng tới): `Pin sạc dự phòng Baseus
+Enerfill FC5` (danh mục "Sạc dự phòng", thương hiệu Baseus).
+
+**Thứ tự xóa** (bắt buộc theo ràng buộc FK trong schema): xóa `Order` trước —
+`OrderItem` và `PaymentTransaction` đều có `onDelete: Cascade` từ Order nên tự
+biến mất; sau đó mới xóa được `Product` (`OrderItem.product` là
+`onDelete: Restrict`, không xóa orderItem trước thì Postgres sẽ chặn).
+
+⚠️ **Lưu ý cho phiên sau**: `Order.orderCode` là `Int @unique
+@default(autoincrement())` — xóa hết bản ghi KHÔNG reset sequence, nên đơn
+hàng thật đầu tiên sẽ mang orderCode **7**, không phải 1. Đây là hành vi bình
+thường của Postgres, không phải lỗi.
+
+**KẾT QUẢ SAU KHI XÓA (đã xác nhận bằng đếm lại trong DB):**
+- Order: 6 → **0** ✅
+- OrderItem: 6 → **0** ✅ (tự biến mất theo cascade, không cần xóa thủ công)
+- PaymentTransaction: 0 → **0** ✅
+- Product: 2 → **1** (chỉ còn `Pin sạc dự phòng Baseus Enerfill FC5` — dữ liệu
+  thật, đúng như dự kiến; sản phẩm test đã biến mất) ✅
+- Toàn bộ script tạm (`tmp-inspect.js`, `tmp-dump.js`, `tmp-cleanup.js`,
+  `tmp-check.js`) đã xóa khỏi `backend/`, `git status` sạch.
+
+⚠️ **PHÁT HIỆN NGOÀI DỰ KIẾN trong lúc xác minh**: sản phẩm thật còn lại đang
+có `isActive = false`, nên `GET /products` trả `total=0` và **storefront hiện
+không hiển thị sản phẩm nào**. Bằng chứng: `updatedAt` của sản phẩm này là
+2026-08-28T21:12:01Z, tức bị sửa ~10 phút TRƯỚC thời điểm chạy script dọn dẹp
+— và script dọn dẹp chỉ `deleteMany` trên Order + `delete` đúng 1 sản phẩm
+test theo id, KHÔNG hề ghi vào `isActive` của sản phẩm này. Nguyên nhân nhiều
+khả năng nhất: có người bấm nút "Xóa" trên sản phẩm này trong trang Admin —
+lúc đó nó vẫn còn 1 orderItem (thuộc đơn số 4) nên `ProductService.remove()`
+đi vào nhánh **soft-delete** (`isActive: false`) thay vì xóa cứng. Đây là
+hành vi ĐÚNG của service, không phải bug. Đang chờ người dùng xác nhận có bật
+lại `isActive = true` hay không.
