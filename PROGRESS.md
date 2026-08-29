@@ -95,6 +95,14 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 *(Bug PATCH variants: đã test PASS 2026-08-29, không còn nợ gì.)*
 
 **ƯU TIÊN 0 — bug UX message lỗi mã giảm giá (2026-08-29, mới sửa):**
+*(Tầng BACKEND đã được người dùng tự xác nhận đúng qua `curl` TRƯỚC khi yêu
+cầu sửa — `GET /discounts/code/:code` luôn trả đúng 3 message phân biệt rõ
+ràng theo từng lý do, đây là code gốc có sẵn từ commit đầu tiên của dự án,
+không phải do phiên này viết. Phần DUY NHẤT chưa từng được test là hiển thị
+thật trên UI trang giỏ hàng — vì bug nằm ở tầng Frontend, độc lập với
+backend. Đã xác nhận bằng `git log --follow` trên `cart/page.tsx`: khối
+`catch` chứa message cứng tồn tại từ commit đầu tiên, KHÔNG có commit nào
+trước đó từng sửa nó — đây là lần sửa đầu tiên, không phải làm lại việc cũ.)*
 1. Làm mã `QUOCE10` hết lượt (`usedCount = maxUsage`, hiện đang 0/10 vì đã
    reset sau lượt trước — cần đặt 10 đơn dùng mã này hoặc hạ tạm `maxUsage`
    để test nhanh).
@@ -536,3 +544,18 @@ biệt rõ 3 message khác nhau cho 3 trường hợp này từ trước.
   kiểm tra → ƯU TIÊN 0" ở phần Trạng thái hiện tại: test cả 2 ca (hết lượt và
   không tồn tại) để chắc chắn message đổi đúng theo từng lý do, không phải
   vẫn hiện trùng 1 câu.
+
+**Xác minh KHÔNG PHẢI làm lại việc đã xong** (người dùng hỏi lại để chắc chắn
+đây là commit mới, không phải lặp lại 1 fix cũ): đã chạy
+`git log --follow -- frontend/src/app/cart/page.tsx`, chỉ có 3 commit đụng
+file này — `8a8831d` (Initial commit, khối `catch` với message cứng đã có
+sẵn TỪ ĐẦU DỰ ÁN — `git show 8a8831d:...` xác nhận nguyên văn giống hệt bug
+vừa sửa), `30661e8` (Nhóm F, chỉ sửa nút "Tiến hành thanh toán", không đụng
+khối `catch`), và `003f3e1` (lần sửa ĐẦU TIÊN và duy nhất của khối `catch`
+này). Kết luận: đây là bug có sẵn từ code gốc, chưa từng được sửa trước phiên
+này — không trùng lặp với bất kỳ commit nào.
+Về việc người dùng đã "test PASS" trước đó: đó là test `curl` thẳng vào
+backend (`GET /discounts/code/:code`), xác nhận tầng backend luôn đúng —
+`DiscountsService.validateCode()` có 3 message phân biệt từ code gốc, không
+phải do phiên này viết. Test đó KHÔNG mâu thuẫn với việc bug tồn tại ở tầng
+Frontend, vì đây là 2 tầng độc lập: `curl` không đi qua `cart/page.tsx`.
