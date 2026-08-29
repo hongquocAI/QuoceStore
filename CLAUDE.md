@@ -291,6 +291,11 @@ gửi có phần tử → thay thế toàn bộ.
   ADMIN/CUSTOMER thật có sẵn trong DB): state machine đúng ở mọi ca (nhảy
   cóc, lùi, từ trạng thái cuối đều 400), hoàn kho đúng số lượng khi hủy,
   filter/search đúng, 403 cho CUSTOMER, 401 khi không có cookie
+- ✅ **Người dùng đã test UI thật PASS 6/6 bước (2026-08-29)** — bảng, filter,
+  search, modal chi tiết, đổi trạng thái đều đúng. Không hủy được đơn SHIPPED
+  là kết quả ĐÚNG (state machine chặn đúng). Nhánh cảnh báo PayOS khi hủy đơn
+  PAID chưa test qua UI (không có đơn PENDING/PROCESSING+PAID để thử), chấp
+  nhận mức verify JWT tự ký ở trên là đủ
   - ⚠️ Lưu ý cho phiên sau nếu cần tự ký JWT test: payload PHẢI dùng field
     `sub` (không phải `id`) — `JwtStrategy.validate()` đọc `payload.sub`.
     Dùng field sai sẽ khiến MỌI route có Guard trả 500 (Prisma

@@ -21,13 +21,18 @@
 (code + verify bằng request thật, dữ liệu test đã dọn sạch).
 
 **✅ Nhóm F (phần 2) — Trang quản lý đơn hàng Admin (`/admin/orders`) ĐÃ
-XONG** (2026-08-29): list + filter + search, xem chi tiết, cập nhật
-shippingStatus theo state machine (kèm CANCELLED có hoàn kho — mở rộng so
-với yêu cầu gốc, người dùng đã duyệt). Đã verify đầy đủ bằng JWT tự ký
-(không có credential ADMIN thật để login UI) — xem Nhật ký chi tiết.
+ĐÓNG HOÀN TOÀN** — người dùng test UI thật PASS 6/6 bước (2026-08-29).
 
-⏳ **CÒN CHỜ NGƯỜI DÙNG BẤM QUA UI THẬT** để xác nhận trang `/admin/orders`
-— xem mục "🔍 Cần người dùng kiểm tra" bên dưới.
+**✅ ĐÃ THÊM 18 sản phẩm DEMO** để test trực quan Phân trang/Filter (Nhóm B),
+2026-08-29. Script additive-only (`backend/prisma/seed-demo-products.ts`),
+KHÔNG đụng dữ liệu thật (Order/Discount/sản phẩm Baseus nguyên vẹn — đã xác
+nhận bằng đếm lại). Tổng DB hiện có **19 sản phẩm** (18 demo + 1 thật) →
+`GET /products` giờ có **2 trang thật** với `limit=10`. Tất cả sản phẩm demo
+có tiền tố `[DEMO] ` trong title. **Dọn sạch bất cứ lúc nào trước khi
+go-live** bằng:
+```ts
+await prisma.product.deleteMany({ where: { title: { startsWith: '[DEMO] ' } } });
+```
 
 Việc tiếp theo trong Nhóm F: bảng AuditLog, cảnh báo tồn kho thấp (CLAUDE.md
 mục "VIỆC CẦN LÀM TIẾP — mục 2"). Ngoài ra còn hàng đợi riêng "Cải thiện UX
@@ -105,24 +110,14 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 
 *(Bug PATCH variants: đã test PASS 2026-08-29, không còn nợ gì.)*
 
-**ƯU TIÊN 0 — trang quản lý đơn hàng Admin `/admin/orders` (Nhóm F, mới
-xây 2026-08-29):**
-*(Backend đã verify đầy đủ bằng JWT tự ký — state machine, hoàn kho khi
-hủy, filter/search, phân quyền 403/401 đều đúng, xem Nhật ký chi tiết. Phần
-DUY NHẤT chưa test được là bấm qua UI thật, vì không có credential ADMIN để
-tự đăng nhập trong phiên này.)*
-1. Vào `/admin/orders` (link mới trong menu dropdown Header, mục "📦 Quản lý
-   đơn hàng") — bảng liệt kê đúng đơn hàng thật, có đơn #9 (đơn bạn tự tạo
-   lúc test Discount trước đó) với đúng dòng giảm giá.
-2. Lọc theo trạng thái, gõ tìm kiếm (mã đơn/SĐT/tên khách) — kết quả đúng.
-3. Bấm "Chi tiết" — modal hiện đúng thông tin, đúng dòng giảm giá nếu có.
-4. Thử đổi trạng thái 1 đơn thật (VD PENDING → PROCESSING) — chỉ hiện đúng
-   các nút hợp lệ theo state machine (không có nút nhảy cóc tới DELIVERED).
-5. Thử nút "Hủy đơn" trên 1 đơn — xác nhận dòng cảnh báo hiện đúng, và nếu
-   đơn đó `paymentStatus = PAID` thì PHẢI thấy thêm cảnh báo về việc không
-   tự động hoàn tiền qua PayOS.
-6. Sau khi hủy, vào lại `/products/admin/all` hoặc trang chủ xác nhận tồn
-   kho đã được hoàn lại đúng số lượng.
+**✅ ĐÃ ĐÓNG — trang quản lý đơn hàng Admin `/admin/orders`** (Nhóm F, xây
+2026-08-29, người dùng test UI thật PASS 6/6 bước cùng ngày): bảng hiện đúng
+đơn #9, filter/search đúng, modal chi tiết đúng, đổi trạng thái chỉ hiện nút
+hợp lệ theo state machine. Bước 6 (không hủy được đơn SHIPPED) là **kết quả
+ĐÚNG** — xác nhận state machine chặn đúng, không phải bug. Nhánh "hủy đơn
+PAID hiện cảnh báo PayOS" chưa có đơn PENDING/PROCESSING+PAID nào để thử qua
+UI, nhưng backend đã verify kỹ phần này bằng JWT tự ký trong phiên trước —
+người dùng chấp nhận mức độ verify này là đủ, không cần thêm.
 
 **ƯU TIÊN 1 — bug UX message lỗi mã giảm giá (2026-08-29, mới sửa):**
 *(Tầng BACKEND đã được người dùng tự xác nhận đúng qua `curl` TRƯỚC khi yêu
@@ -133,9 +128,9 @@ thật trên UI trang giỏ hàng — vì bug nằm ở tầng Frontend, độc 
 backend. Đã xác nhận bằng `git log --follow` trên `cart/page.tsx`: khối
 `catch` chứa message cứng tồn tại từ commit đầu tiên, KHÔNG có commit nào
 trước đó từng sửa nó — đây là lần sửa đầu tiên, không phải làm lại việc cũ.)*
-1. Làm mã `QUOCE10` hết lượt (`usedCount = maxUsage`, hiện đang 0/10 vì đã
-   reset sau lượt trước — cần đặt 10 đơn dùng mã này hoặc hạ tạm `maxUsage`
-   để test nhanh).
+1. ✅ Mã `QUOCE10` GIỜ ĐÃ THẬT SỰ HẾT LƯỢT (`usedCount = maxUsage = 10/10`,
+   xác nhận 2026-08-29 lúc verify script seed demo sản phẩm — không cần tự
+   tạo thêm đơn để làm hết lượt nữa, cứ dùng thẳng mã này để test).
 2. Ở `/cart`, nhập `QUOCE10` → bấm "Áp dụng" → PHẢI hiện đúng **"Mã giảm giá
    đã hết lượt sử dụng"**, KHÔNG phải câu chung chung "Mã giảm giá không tồn
    tại hoặc có lỗi kết nối" như trước khi sửa.
@@ -144,6 +139,14 @@ trước đó từng sửa nó — đây là lần sửa đầu tiên, không ph
    → phải hiện **"Mã giảm giá không tồn tại hoặc đã khóa"** — khác câu ở bước 2.
 
 **ƯU TIÊN 2 — luồng checkout có mã giảm giá (Nhóm F, 2026-08-29):**
+⚠️ **CẬP NHẬT 2026-08-29 (lúc verify script demo sản phẩm)**: `QUOCE10` giờ
+đã THẬT SỰ HẾT LƯỢT (`usedCount = maxUsage = 10/10`) — bước 1 dưới đây áp mã
+này sẽ báo "Mã giảm giá đã hết lượt sử dụng" thay vì áp thành công. Đây
+KHÔNG phải bug (đúng hành vi mong đợi, xem ƯU TIÊN 1). Muốn test lại luồng
+checkout THÀNH CÔNG với mã, người dùng cần: (a) tăng `maxUsage` của
+`QUOCE10` qua Prisma Studio, hoặc (b) tự tạo 1 discount code mới. Không tự ý
+sửa `usedCount`/`maxUsage` của mã này trong lúc thêm dữ liệu demo vì đó là
+dữ liệu thật phản ánh lịch sử dùng thật, ngoài phạm vi yêu cầu.
 1. Vào `/cart`, thêm 1-2 sản phẩm, nhập mã `QUOCE10` → bấm "Áp dụng" → thấy
    dòng "Giảm giá" + "Tổng cộng" đúng 10%.
 2. Bấm "Tiến hành thanh toán" → sang `/checkout` → PHẢI thấy lại đúng dòng
@@ -605,3 +608,51 @@ không tự động hoàn tiền.
     `tmp-debug-findall.js`, `tmp-cleanup3.js`, `tmp_token.txt`,
     `tmp_customer_token.txt`, `tmp_test_order_id.txt`) đã xóa khỏi
     `backend/`, `git status` sạch.
+
+### [2026-08-29] Đã thêm 18 sản phẩm DEMO để test trực quan Phân trang/Filter
+
+Người dùng yêu cầu thêm dữ liệu mẫu để thấy rõ hiệu ứng phân trang/filter đã
+xây ở Nhóm B (trước đó DB chỉ có đúng 1 sản phẩm thật nên không thấy được
+phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts` hay bất kỳ
+`deleteMany()` nào (DB có dữ liệu thật: tài khoản Admin đang dùng, đơn hàng
+#9, sản phẩm Baseus) — chỉ được viết script THUẦN THÊM.
+
+- **File đã tạo**: `backend/prisma/seed-demo-products.ts` (MỚI, giữ lại
+  trong repo — không phải file tạm, có thể chạy lại sau này nếu cần thêm dữ
+  liệu demo). Đặc điểm:
+  - Tra Category/Brand theo **slug** (`phu-kien`, `baseus`), KHÔNG hard code
+    UUID — an toàn nếu id đổi về sau.
+  - Rải 2 sản phẩm demo cho MỖI subCategory thật đã có trong DB (9
+    subCategory × 2 = 18 sản phẩm), tra subCategory cũng theo slug.
+  - Mọi title có tiền tố `[DEMO] ` để dễ nhận biết + dọn sạch sau này.
+  - **Idempotent**: check `slug` (unique) trước khi tạo, chạy lại nhiều lần
+    không tạo trùng — an toàn nếu lỡ chạy 2 lần.
+  - Dùng lại đúng thuật toán `slugify` đã có ở `admin/products/page.tsx`
+    (Frontend) để đồng bộ cách sinh slug trong dự án.
+  - Chạy bằng `npx ts-node prisma/seed-demo-products.ts` (đúng cơ chế
+    `ts-node` sẵn có, cùng cách chạy với `seed.ts`).
+
+- **Đã test**:
+  - `npx tsc --noEmit` → 0 lỗi.
+  - Chạy script → `✅ Đã tạo mới: 18 sản phẩm demo. Bỏ qua: 0.`
+  - `GET /products?limit=100` → `total = 19` (18 demo + 1 thật), sản phẩm
+    Baseus thật vẫn còn nguyên trong danh sách.
+  - `GET /products?page=1&limit=10` vs `page=2&limit=10` → **2 trang thật**,
+    10 + 9 item, khác nhau — phân trang giờ có ý nghĩa để test trực quan.
+  - Filter `subCategoryId` (sạc dự phòng) → `total = 3` (2 demo + 1 thật) —
+    đúng.
+  - **Xác nhận dữ liệu thật KHÔNG bị đụng**: đếm lại trực tiếp qua Prisma —
+    `Order.count() = 1` (vẫn chỉ có đơn #9), `Discount.findUnique('QUOCE10')`
+    vẫn nguyên vẹn (chỉ khác `usedCount` do người dùng tự test trước đó,
+    KHÔNG liên quan gì tới script này — script không đụng bảng `Discount`
+    hay `Order`, chỉ tạo `Product`), `Product.count() = 19` khớp đúng dự
+    kiến.
+
+- **Lưu ý/vấn đề gặp phải**:
+  - Không có vấn đề. Script chạy đúng ngay lần đầu, đã verify kỹ trước khi
+    báo hoàn thành.
+  - **Nhắc cho phiên sau**: `backend/prisma/seed-demo-products.ts` là script
+    ĐƯỢC GIỮ LẠI trong repo (không phải file tạm cần xóa) — có thể chạy lại
+    an toàn (idempotent) nếu cần thêm dữ liệu demo sau này. TRƯỚC khi
+    go-live thật (Nhóm E), phải dọn sạch 18 sản phẩm demo bằng
+    `prisma.product.deleteMany({ where: { title: { startsWith: '[DEMO] ' } } })`.
