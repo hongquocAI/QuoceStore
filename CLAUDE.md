@@ -248,6 +248,10 @@ gửi có phần tử → thay thế toàn bộ.
   mã, không gửi % hay số tiền) trong `POST /orders`. Server luôn là nguồn sự
   thật cuối cùng — màn hình kết quả sau khi đặt hàng dùng
   `orderResult.discountAmount` từ response, không dùng số preview client tính
+- 🛡️ BUG UX đã sửa (phát hiện qua `curl`): `cart/page.tsx` từng hiển thị
+  CỨNG 1 câu lỗi chung cho mọi ca áp mã thất bại, bỏ qua message rõ ràng theo
+  từng lý do (hết hạn/hết lượt/không tồn tại) mà `validateCode()` đã trả sẵn.
+  Đã sửa đọc `err.response?.data?.message` thay vì chuỗi cứng.
 
 ### Hạ tầng quản lý mã nguồn (MỚI)
 - Git repo đã khởi tạo tại thư mục gốc D:\Projects\quoce_store (KHÔNG phải

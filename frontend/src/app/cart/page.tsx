@@ -36,9 +36,16 @@ const handleApplyCoupon = async () => {
       setCouponMessage('Mã giảm giá không hợp lệ hoặc đã hết hạn.');
       setDiscount(0);
     }
-  } catch (err) {
-    // ⚡ KHÔNG còn fallback giả lập — lỗi thật thì báo lỗi thật.
-    setCouponMessage('Mã giảm giá không tồn tại hoặc có lỗi kết nối, vui lòng thử lại.');
+  } catch (err: any) {
+    // 🛡️ FIX BUG: trước đây hiển thị CỨNG 1 câu chung chung cho MỌI lỗi, dù
+    // backend đã trả message rõ ràng riêng biệt cho từng ca (hết hạn/hết
+    // lượt/không tồn tại) — xem DiscountsService.validateCode(). Đọc đúng
+    // message thật từ response lỗi để khách biết chính xác vì sao mã không
+    // dùng được, chỉ fallback về câu chung chung khi thật sự không có message
+    // (VD lỗi mạng, server sập).
+    setCouponMessage(
+      err.response?.data?.message || 'Mã giảm giá không tồn tại hoặc có lỗi kết nối, vui lòng thử lại.',
+    );
     setDiscount(0);
   }
 };

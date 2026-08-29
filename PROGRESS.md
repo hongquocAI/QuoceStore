@@ -7,7 +7,7 @@
 > (không append thêm bản cũ bên dưới) — đây là nguồn duy nhất trả lời "đang ở
 > đâu, tiếp theo làm gì NGAY BÂY GIỜ" mà không cần đọc hết lịch sử bên dưới.
 >
-> **(2) 📜 NHẬT KÝ CHI TIẾT** — CHỈ được append thêm vào cuối, KHÔNG sửa/xóa
+> **(2) 📜 NHẬT KÝ CHI TIẾT** — CHỈ được append thêm vào cuối, KHÔNG sửa/xóax`
 > entry cũ — đây là lịch sử để tra cứu "việc X đã làm chưa, làm bằng cách
 > nào, gặp vấn đề gì" khi cần debug hoặc đối chiếu.
 
@@ -21,6 +21,11 @@
 (code + verify bằng request thật, dữ liệu test đã dọn sạch). Việc tiếp theo
 trong Nhóm F: bảng AuditLog, trang quản lý đơn hàng Admin, cảnh báo tồn kho
 thấp (CLAUDE.md mục "VIỆC CẦN LÀM TIẾP — mục 2").
+
+**✅ Bug UX kèm theo đã sửa (2026-08-29)**: `cart/page.tsx` hiển thị message
+lỗi CỨNG cho mọi lỗi áp mã, bỏ qua message thật rõ ràng từ backend. Người
+dùng phát hiện qua `curl` trực tiếp. Đã sửa đọc `err.response?.data?.message`.
+Chưa tự bấm qua UI được (không có trình duyệt) — cần người dùng xác nhận lại.
 
 ⏳ **CÒN CHỜ NGƯỜI DÙNG KIỂM TRA TAY luồng checkout có mã giảm giá** — xem
 mục "🔍 Cần người dùng kiểm tra" bên dưới. Backend đã verify đầy đủ bằng
@@ -88,6 +93,17 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 ### 🔍 Cần người dùng kiểm tra (chưa tự verify được trong phiên này)
 
 *(Bug PATCH variants: đã test PASS 2026-08-29, không còn nợ gì.)*
+
+**ƯU TIÊN 0 — bug UX message lỗi mã giảm giá (2026-08-29, mới sửa):**
+1. Làm mã `QUOCE10` hết lượt (`usedCount = maxUsage`, hiện đang 0/10 vì đã
+   reset sau lượt trước — cần đặt 10 đơn dùng mã này hoặc hạ tạm `maxUsage`
+   để test nhanh).
+2. Ở `/cart`, nhập `QUOCE10` → bấm "Áp dụng" → PHẢI hiện đúng **"Mã giảm giá
+   đã hết lượt sử dụng"**, KHÔNG phải câu chung chung "Mã giảm giá không tồn
+   tại hoặc có lỗi kết nối" như trước khi sửa.
+3. Test thêm 1 ca khác để chắc chắn message thay đổi theo đúng lý do (không
+   phải luôn hiện đúng 1 câu trùng hợp): nhập mã không tồn tại (VD `ABCXYZ`)
+   → phải hiện **"Mã giảm giá không tồn tại hoặc đã khóa"** — khác câu ở bước 2.
 
 **ƯU TIÊN 1 — luồng checkout có mã giảm giá (Nhóm F, 2026-08-29):**
 1. Vào `/cart`, thêm 1-2 sản phẩm, nhập mã `QUOCE10` → bấm "Áp dụng" → thấy
@@ -489,3 +505,34 @@ nhân (`subtotal * discount`, không chia 100).
     kiểm tra" phần Trạng thái hiện tại.
   - Mã `QUOCE10` vẫn còn nguyên trong DB (không xóa) — đây là dữ liệu hữu ích
     để người dùng tự test UI, không phải rác cần dọn.
+
+### [2026-08-29] Đã sửa BUG UX: message lỗi mã giảm giá bị gộp chung 1 câu
+
+**Người dùng phát hiện qua `curl` trực tiếp**: gọi
+`GET /discounts/code/QUOCE10` lúc `usedCount = maxUsage` (hết lượt), backend
+trả đúng và rõ ràng:
+```json
+{"success":false,"statusCode":404,"error":"Not Found","message":"Mã giảm giá đã hết lượt sử dụng",...}
+```
+Backend hoàn toàn đúng — bug nằm ở Frontend: `cart/page.tsx`,
+`handleApplyCoupon` có khối `catch` bỏ qua hẳn message thật trong response
+lỗi, hiển thị **CỨNG 1 câu duy nhất** ("Mã giảm giá không tồn tại hoặc có lỗi
+kết nối, vui lòng thử lại") cho **MỌI** loại lỗi — hết hạn, hết lượt, không
+tồn tại đều hiện y hệt nhau, dù `DiscountsService.validateCode()` đã phân
+biệt rõ 3 message khác nhau cho 3 trường hợp này từ trước.
+
+- **File đã sửa**: `frontend/src/app/cart/page.tsx` — khối `catch` của
+  `handleApplyCoupon` đổi từ hiển thị chuỗi cứng sang đọc
+  `err.response?.data?.message`, chỉ fallback về câu chung chung khi thật sự
+  không có message (lỗi mạng, server sập).
+- **Đã xác nhận qua đối chiếu code** (KHÔNG tự bấm qua UI được — không có
+  trình duyệt trong phiên này): `lib/api.ts` — interceptor response chỉ can
+  thiệp vào lỗi 401 (refresh token), mọi lỗi khác được `Promise.reject(error)`
+  nguyên trạng, nên `err.response.data.message` giữ đúng shape mà
+  `GlobalExceptionFilter` trả về, khớp chính xác với dữ liệu `curl` người
+  dùng đã kiểm tra.
+- `npx tsc --noEmit` (frontend) → 0 lỗi.
+- **CẦN NGƯỜI DÙNG XÁC NHẬN LẠI TRÊN UI THẬT** — xem mục "🔍 Cần người dùng
+  kiểm tra → ƯU TIÊN 0" ở phần Trạng thái hiện tại: test cả 2 ca (hết lượt và
+  không tồn tại) để chắc chắn message đổi đúng theo từng lý do, không phải
+  vẫn hiện trùng 1 câu.
