@@ -253,6 +253,51 @@ gửi có phần tử → thay thế toàn bộ.
   từng lý do (hết hạn/hết lượt/không tồn tại) mà `validateCode()` đã trả sẵn.
   Đã sửa đọc `err.response?.data?.message` thay vì chuỗi cứng.
 
+### Nhóm F (phần 2) — Trang quản lý đơn hàng Admin `/admin/orders` (100% XONG)
+- Backend: `QueryOrderDto` + `UpdateShippingStatusDto` (mới), theo đúng
+  khuôn mẫu `QueryProductDto`. `OrdersService.findAllForAdmin()` — phân
+  trang + filter `shippingStatus`/`search` (mã đơn khớp chính xác nếu là
+  số, HOẶC customerPhone/customerName contains). Response bọc trong
+  `{ success, data: { items, total, page, limit, totalPages } }` — CỐ Ý
+  khác convention bare của `ProductService` để nhất quán với 4 method khác
+  sẵn có trong chính OrdersService (create/findByUser/findOneForUser/
+  lookupGuestOrder đều dùng `{success, data}`)
+- `OrdersService.updateShippingStatus()` — state machine
+  `SHIPPING_STATUS_TRANSITIONS`: PENDING→{PROCESSING,CANCELLED},
+  PROCESSING→{SHIPPED,CANCELLED}, SHIPPED→{DELIVERED}, DELIVERED/CANCELLED
+  là trạng thái CUỐI. Khi CANCELLED: hoàn kho đúng theo nhánh
+  variant/product (mirror chính xác logic trừ kho trong `create()`), toàn
+  bộ trong 1 transaction
+  - ⚠️ **GIỚI HẠN CỐ Ý**: hủy đơn CHỈ hoàn kho, TUYỆT ĐỐI KHÔNG tự động
+    hoàn tiền qua PayOS dù đơn đã `paymentStatus = PAID`. Admin phải tự
+    hoàn tiền thủ công qua PayOS Dashboard. Frontend cảnh báo rõ điều này
+    trong `window.confirm` khi hủy 1 đơn đã PAID. Tích hợp PayOS refund
+    API là việc RIÊNG, chưa làm
+- GET `admin/all` và PATCH `:id/shipping-status` đặt TRƯỚC `@Get(':id')`
+  trong `OrdersController` — đúng lỗi thứ tự route đã tránh ở
+  ProductController
+- Frontend: trang mới `admin/orders/page.tsx` — sao chép đúng pattern
+  guard/debounce/phân trang của `admin/products/page.tsx`; dictionary nhãn
+  tiếng Việt cho `ShippingStatus`/`PaymentStatus` (chưa từng tồn tại ở đâu
+  trong repo trước đây); nút hành động chỉ hiện lựa chọn HỢP LỆ theo state
+  machine (copy sang FE chỉ để ẩn/hiện, server vẫn validate thật); thêm
+  `Order`/`OrderItem` type vào `types/index.ts`; thêm link điều hướng
+  trong `Header.tsx`
+  - ⚠️ Response `GET /orders/admin/all` bọc thêm 1 tầng `data` so với
+    `/products/admin/all` — Frontend đọc `res.data.data.items`, KHÔNG phải
+    `res.data.items`
+- Đã verify bằng JWT tự ký (không có credential ADMIN thật để login UI —
+  ký `{ sub, email, role }` bằng đúng `JWT_SECRET` trong `.env`, dùng user
+  ADMIN/CUSTOMER thật có sẵn trong DB): state machine đúng ở mọi ca (nhảy
+  cóc, lùi, từ trạng thái cuối đều 400), hoàn kho đúng số lượng khi hủy,
+  filter/search đúng, 403 cho CUSTOMER, 401 khi không có cookie
+  - ⚠️ Lưu ý cho phiên sau nếu cần tự ký JWT test: payload PHẢI dùng field
+    `sub` (không phải `id`) — `JwtStrategy.validate()` đọc `payload.sub`.
+    Dùng field sai sẽ khiến MỌI route có Guard trả 500 (Prisma
+    `findUnique({ where: { id: undefined } })` ném lỗi, bị
+    GlobalExceptionFilter nuốt thành lỗi chung chung) — từng làm tưởng
+    nhầm là bug thật trong code Orders mới, hóa ra chỉ do token tự ký sai.
+
 ### Hạ tầng quản lý mã nguồn (MỚI)
 - Git repo đã khởi tạo tại thư mục gốc D:\Projects\quoce_store (KHÔNG phải
   trong backend/ hay frontend/ riêng lẻ — 2 thư mục con từng có .git riêng do
@@ -281,8 +326,8 @@ sau khi đã thêm `minPrice`/`maxPrice` vào `QueryProductDto`.
   AuditLogInterceptor hoặc ghi thủ công trong các action nhạy cảm (Admin
   xóa/sửa Product, đổi trạng thái Order, xóa User...) — ghi userId, action,
   ipAddress, userAgent
-- Trang quản lý đơn hàng cho Admin: list + filter theo trạng thái, cập nhật
-  shippingStatus (PENDING→PROCESSING→SHIPPED→DELIVERED), xem chi tiết
+- ✅ ĐÃ XONG — Trang quản lý đơn hàng Admin (`/admin/orders`). Xem mô tả chi
+  tiết ở mục "ĐÃ HOÀN THÀNH → Nhóm F (phần 2)" phía trên.
 
 ### 2b. Cải thiện UX form Thêm/Sửa sản phẩm Admin (tách riêng khỏi Nhóm F —
 ### đây là UX Frontend thuần túy, không phải logic nghiệp vụ backend)

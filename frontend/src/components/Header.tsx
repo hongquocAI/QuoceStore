@@ -62,13 +62,23 @@ export default function Header() {
 
                   {/* ⚡ ĐIỀU KIỆN PHÂN QUYỀN: Chỉ hiển thị mục Quản lý sản phẩm nếu user là ADMIN[cite: 17] */}
                   {user.role === 'ADMIN' && (
-                    <Link 
-                      href="/admin/products" 
-                      className="block px-4 py-3 bg-gray-50 text-black font-black hover:bg-black hover:text-white transition border-b border-gray-200"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      ⚡ Quản trị hệ thống (Admin)
-                    </Link>
+                    <>
+                      <Link
+                        href="/admin/products"
+                        className="block px-4 py-3 bg-gray-50 text-black font-black hover:bg-black hover:text-white transition border-b border-gray-200"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        ⚡ Quản trị hệ thống (Admin)
+                      </Link>
+                      {/* ⚡ Nhóm F: trang quản lý đơn hàng Admin mới */}
+                      <Link
+                        href="/admin/orders"
+                        className="block px-4 py-3 bg-gray-50 text-black font-black hover:bg-black hover:text-white transition border-b border-gray-200"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        📦 Quản lý đơn hàng
+                      </Link>
+                    </>
                   )}
 
                   <Link 

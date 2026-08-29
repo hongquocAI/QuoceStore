@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Post, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,6 +7,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
 import { LookupOrderDto } from './dto/lookup-order.dto';
+import { QueryOrderDto } from './dto/query-order.dto';
+import { UpdateShippingStatusDto } from './dto/update-shipping-status.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -47,6 +49,28 @@ export class OrdersController {
   @Post('lookup')
   async lookupGuestOrder(@Body() dto: LookupOrderDto) {
     return this.ordersService.lookupGuestOrder(dto);
+  }
+
+  // ⚡ Trang quản lý đơn hàng Admin: liệt kê TOÀN BỘ đơn hàng, phân trang +
+  // filter. ⚠️ PHẢI đặt TRƯỚC @Get(':id') bên dưới — nếu không, NestJS sẽ
+  // khớp "admin" vào :id trước (đúng lỗi thứ tự route đã tránh ở
+  // ProductController với route admin/all).
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async findAllForAdmin(@Query() query: QueryOrderDto) {
+    return this.ordersService.findAllForAdmin(query);
+  }
+
+  // ⚡ Trang quản lý đơn hàng Admin: cập nhật shippingStatus theo state
+  // machine (xem SHIPPING_STATUS_TRANSITIONS trong OrdersService). Route
+  // này là PATCH nên không tranh chấp thứ tự với GET :id ở dưới, nhưng vẫn
+  // đặt cạnh route admin/all cho dễ đọc theo nhóm chức năng Admin.
+  @Patch(':id/shipping-status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async updateShippingStatus(@Param('id') id: string, @Body() dto: UpdateShippingStatusDto) {
+    return this.ordersService.updateShippingStatus(id, dto);
   }
 
   // 🛡️ FIX: Trước đây PUBLIC hoàn toàn -> lộ tên, SĐT, địa chỉ của bất kỳ

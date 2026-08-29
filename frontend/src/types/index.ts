@@ -68,3 +68,34 @@ export interface Paginated<T> {
   limit: number;
   totalPages: number;
 }
+
+// ⚡ Nhóm F: dùng cho trang quản lý đơn hàng Admin. Tối thiểu đủ field đang
+// dùng, không thiết kế lại toàn bộ (Order/OrderItem chưa từng có type ở FE).
+export interface OrderItem {
+  id: string;
+  productId: string;
+  variantId?: string | null;
+  variantColorName?: string | null;
+  quantity: number;
+  priceAtPurchase: number;
+  product?: Product;
+  variant?: ProductVariant;
+}
+
+export interface Order {
+  id: string;
+  orderCode: number;
+  userId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  address: string;
+  paymentMethod: string;
+  totalAmount: number;
+  discountCode?: string | null;
+  discountAmount: number;
+  paymentStatus: PaymentStatus;
+  shippingStatus: ShippingStatus;
+  createdAt: string;
+  orderItems: OrderItem[];
+}

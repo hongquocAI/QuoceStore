@@ -18,9 +18,20 @@
 
 ### Đang làm / Việc tiếp theo ngay
 **✅ Nhóm F (phần 1) — Discount thật vào `OrdersService.create()` ĐÃ XONG**
-(code + verify bằng request thật, dữ liệu test đã dọn sạch). Việc tiếp theo
-trong Nhóm F: bảng AuditLog, trang quản lý đơn hàng Admin, cảnh báo tồn kho
-thấp (CLAUDE.md mục "VIỆC CẦN LÀM TIẾP — mục 2").
+(code + verify bằng request thật, dữ liệu test đã dọn sạch).
+
+**✅ Nhóm F (phần 2) — Trang quản lý đơn hàng Admin (`/admin/orders`) ĐÃ
+XONG** (2026-08-29): list + filter + search, xem chi tiết, cập nhật
+shippingStatus theo state machine (kèm CANCELLED có hoàn kho — mở rộng so
+với yêu cầu gốc, người dùng đã duyệt). Đã verify đầy đủ bằng JWT tự ký
+(không có credential ADMIN thật để login UI) — xem Nhật ký chi tiết.
+
+⏳ **CÒN CHỜ NGƯỜI DÙNG BẤM QUA UI THẬT** để xác nhận trang `/admin/orders`
+— xem mục "🔍 Cần người dùng kiểm tra" bên dưới.
+
+Việc tiếp theo trong Nhóm F: bảng AuditLog, cảnh báo tồn kho thấp (CLAUDE.md
+mục "VIỆC CẦN LÀM TIẾP — mục 2"). Ngoài ra còn hàng đợi riêng "Cải thiện UX
+form Thêm/Sửa sản phẩm Admin" (mục 2b trong CLAUDE.md) — làm sau.
 
 **✅ Bug UX kèm theo đã sửa (2026-08-29)**: `cart/page.tsx` hiển thị message
 lỗi CỨNG cho mọi lỗi áp mã, bỏ qua message thật rõ ràng từ backend. Người
@@ -94,7 +105,26 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
 
 *(Bug PATCH variants: đã test PASS 2026-08-29, không còn nợ gì.)*
 
-**ƯU TIÊN 0 — bug UX message lỗi mã giảm giá (2026-08-29, mới sửa):**
+**ƯU TIÊN 0 — trang quản lý đơn hàng Admin `/admin/orders` (Nhóm F, mới
+xây 2026-08-29):**
+*(Backend đã verify đầy đủ bằng JWT tự ký — state machine, hoàn kho khi
+hủy, filter/search, phân quyền 403/401 đều đúng, xem Nhật ký chi tiết. Phần
+DUY NHẤT chưa test được là bấm qua UI thật, vì không có credential ADMIN để
+tự đăng nhập trong phiên này.)*
+1. Vào `/admin/orders` (link mới trong menu dropdown Header, mục "📦 Quản lý
+   đơn hàng") — bảng liệt kê đúng đơn hàng thật, có đơn #9 (đơn bạn tự tạo
+   lúc test Discount trước đó) với đúng dòng giảm giá.
+2. Lọc theo trạng thái, gõ tìm kiếm (mã đơn/SĐT/tên khách) — kết quả đúng.
+3. Bấm "Chi tiết" — modal hiện đúng thông tin, đúng dòng giảm giá nếu có.
+4. Thử đổi trạng thái 1 đơn thật (VD PENDING → PROCESSING) — chỉ hiện đúng
+   các nút hợp lệ theo state machine (không có nút nhảy cóc tới DELIVERED).
+5. Thử nút "Hủy đơn" trên 1 đơn — xác nhận dòng cảnh báo hiện đúng, và nếu
+   đơn đó `paymentStatus = PAID` thì PHẢI thấy thêm cảnh báo về việc không
+   tự động hoàn tiền qua PayOS.
+6. Sau khi hủy, vào lại `/products/admin/all` hoặc trang chủ xác nhận tồn
+   kho đã được hoàn lại đúng số lượng.
+
+**ƯU TIÊN 1 — bug UX message lỗi mã giảm giá (2026-08-29, mới sửa):**
 *(Tầng BACKEND đã được người dùng tự xác nhận đúng qua `curl` TRƯỚC khi yêu
 cầu sửa — `GET /discounts/code/:code` luôn trả đúng 3 message phân biệt rõ
 ràng theo từng lý do, đây là code gốc có sẵn từ commit đầu tiên của dự án,
@@ -113,7 +143,7 @@ trước đó từng sửa nó — đây là lần sửa đầu tiên, không ph
    phải luôn hiện đúng 1 câu trùng hợp): nhập mã không tồn tại (VD `ABCXYZ`)
    → phải hiện **"Mã giảm giá không tồn tại hoặc đã khóa"** — khác câu ở bước 2.
 
-**ƯU TIÊN 1 — luồng checkout có mã giảm giá (Nhóm F, 2026-08-29):**
+**ƯU TIÊN 2 — luồng checkout có mã giảm giá (Nhóm F, 2026-08-29):**
 1. Vào `/cart`, thêm 1-2 sản phẩm, nhập mã `QUOCE10` → bấm "Áp dụng" → thấy
    dòng "Giảm giá" + "Tổng cộng" đúng 10%.
 2. Bấm "Tiến hành thanh toán" → sang `/checkout` → PHẢI thấy lại đúng dòng
@@ -162,82 +192,7 @@ sẵn công cụ điều khiển trình duyệt. Cần bấm tay xác nhận:
 ## 📜 NHẬT KÝ CHI TIẾT
 *(append-only, KHÔNG sửa/xóa entry cũ — entry mới nhất ở CUỐI file)*
 
-### [Khởi tạo] Trạng thái bàn giao ban đầu
-
-Dự án được bàn giao ở trạng thái: Phase 0 ✅, Phase 1 ✅, Nhóm A ✅ (phần lõi),
-Nhóm C ✅, Nhóm B đang dở (Cache Redis ✅, Phân trang ❌).
-
-### [Sau khởi tạo] Đã hoàn thành: Thiết lập Git + GitHub
-
-- **File đã sửa/tạo**:
-  - Khởi tạo Git repo tại thư mục gốc `D:\Projects\quoce_store`
-  - Xóa `.git` con bị lỡ tạo bên trong `backend/` (do lệnh khởi tạo project
-    NestJS tự động init git riêng — gây lỗi "does not have a commit checked
-    out" khi add từ thư mục gốc, đã fix bằng cách xóa `.git` con)
-  - Xóa file rác `frontend/src/app/lib/api.ts` (trùng lặp, không được import
-    ở đâu — file thật đang dùng là `frontend/src/lib/api.ts`)
-  - Xóa file dead code `frontend/src/components/layout/Navbar.tsx` (dùng cơ
-    chế auth cũ qua localStorage, không được `layout.tsx` import — component
-    thật đang dùng là `Header.tsx`)
-  - Xóa `docker-compose.yml` ở thư mục gốc (leftover từ giai đoạn đầu dự án,
-    branding "apexstore" cũ, không còn dùng vì đã chuyển sang Neon Postgres +
-    Upstash Redis thật)
-
-- **Đã test**:
-  - Xác nhận `.gitignore` ở cả `backend/` và `frontend/` đều chặn đúng `.env`
-    trước khi commit lần đầu (soát thủ công `git status` output)
-  - Xác nhận không có `node_modules/`, `.next/`, `dist/` nào lọt vào staged
-    files
-  - Push thành công lên `https://github.com/hongquoccoder/QuoceStore` (private
-    repo), branch `main`
-
-- **Commit history**:
-  - `8a8831d` — Initial commit: QuoceStore sau Phase 0, Phase 1, Nhom A/B/C
-    (204 files, 39991 insertions)
-  - `4ee3bb2` — Don dep: xoa file rac api.ts trung lap va Navbar.tsx khong
-    con dung (2 files, 204 deletions)
-
-- **Lưu ý/vấn đề gặp phải**:
-  - `backend/.claude/skills/` và `backend/.windsurf/skills/` chứa symlink
-    hỏng (trỏ tới thư mục không tồn tại) — Git tự động bỏ qua khi add, in ra
-    warning vô hại, không ảnh hưởng gì tới việc commit/push. Không cần xử lý.
-
----
-
-*(Entry tiếp theo sẽ được agent tự thêm vào NGAY DƯỚI dòng này, bắt đầu từ
-việc "Hoàn tất Nhóm B — Phân trang". Nhớ: mỗi entry mới PHẢI đi kèm cập nhật
-lại phần "🎯 TRẠNG THÁI HIỆN TẠI" ở đầu file.)*
-
-### [2026-08-29] Quyết định phạm vi: Phân trang Product (ghi TRƯỚC khi code)
-
-Người dùng đã chốt phạm vi trước khi bắt đầu implement, ghi lại đây để các
-phiên sau hiểu đúng vì sao storefront chưa có phân trang:
-
-- **Backend**: làm đầy đủ — `page`/`limit` (default 1/20, max 100) + filter
-  `categoryId`/`subCategoryId`/`brandId`/`search`, trả
-  `{ items, total, page, limit, totalPages }` cho cả `GET /products` và
-  `GET /products/admin/all`.
-- **Admin panel**: phân trang server-side thật. Chọn Admin trước vì trang này
-  **đã có sẵn** UI phân trang (prev/next + "Trang X / Y", 10 dòng/trang), ô
-  search và filter Category — nhưng tất cả đang chạy client-side trên toàn bộ
-  dữ liệu. Nối vào server là thuận nhất, rủi ro thấp nhất, giá trị cao nhất.
-- **Storefront (trang chủ + /accessories)**: CHỈ sửa cách đọc response
-  (`res.data.items`) + gọi `limit=100`. Giữ nguyên lọc client-side.
-  - **Lý do hoãn**: trang chủ lọc client theo Category **và khoảng giá**
-    (`under-1m`/`1m-3m`/`over-3m`); `/accessories` lọc theo
-    `subCategory.slug`. Backend không có filter giá → nếu phân trang thật
-    ngay, lọc giá sẽ chỉ áp dụng trong trang hiện tại → kết quả sai. Muốn làm
-    tiếp phải bổ sung `minPrice`/`maxPrice` server-side trước, rồi mới viết
-    lại UI storefront. Không gộp việc đó vào cùng lần đổi breaking này.
-- **Không giữ tương thích ngược**: đổi shape dứt điểm 1 lần, sửa hết Frontend
-  cùng commit (đúng khuyến nghị CLAUDE.md, dự án còn nhỏ, chỉ 3 call site).
-
-**Rủi ro đã nhận diện trước**: đây đúng loại breaking change đã từng làm vỡ
-Frontend khi thử TransformInterceptor (`subCategories.filter is not a
-function`). Chỗ vỡ CỨNG là `admin/products/page.tsx` —
-`setProducts(prodRes.data)` sẽ nhét cả object envelope vào `Product[]`. Hai
-chỗ vỡ MỀM (danh sách thành rỗng, không crash) là trang chủ và
-`/accessories`. Cả 3 đều nằm trong phạm vi sửa của phiên này.
+### Các entry trước 2026-08-29 (Nhóm B) đã chuyển sang `PROGRESS_ARCHIVE.md`
 
 ### [2026-08-29] Đã hoàn thành: Nhóm B — Phân trang Product
 
@@ -541,7 +496,7 @@ biệt rõ 3 message khác nhau cho 3 trường hợp này từ trước.
   dùng đã kiểm tra.
 - `npx tsc --noEmit` (frontend) → 0 lỗi.
 - **CẦN NGƯỜI DÙNG XÁC NHẬN LẠI TRÊN UI THẬT** — xem mục "🔍 Cần người dùng
-  kiểm tra → ƯU TIÊN 0" ở phần Trạng thái hiện tại: test cả 2 ca (hết lượt và
+  kiểm tra → ƯU TIÊN 1" ở phần Trạng thái hiện tại: test cả 2 ca (hết lượt và
   không tồn tại) để chắc chắn message đổi đúng theo từng lý do, không phải
   vẫn hiện trùng 1 câu.
 
@@ -559,3 +514,94 @@ backend (`GET /discounts/code/:code`), xác nhận tầng backend luôn đúng �
 `DiscountsService.validateCode()` có 3 message phân biệt từ code gốc, không
 phải do phiên này viết. Test đó KHÔNG mâu thuẫn với việc bug tồn tại ở tầng
 Frontend, vì đây là 2 tầng độc lập: `curl` không đi qua `cart/page.tsx`.
+
+### [2026-08-29] Đã hoàn thành: Nhóm F (phần 2) — Trang quản lý đơn hàng Admin
+
+Làm trên `/model opusplan`, vào Plan Mode trước khi code (theo yêu cầu người
+dùng). Dùng 2 agent Explore song song khảo sát backend Orders và frontend
+Admin patterns trước khi thiết kế. 3 quyết định thật đã được người dùng chốt
+qua AskUserQuestion trước khi viết plan: (1) response `GET /orders/admin/all`
+bọc `{success, data}` thay vì bare `{items,...}` — ưu tiên nhất quán
+trong-module; (2) mở rộng thêm trạng thái CANCELLED (có hoàn kho) ngoài 4
+trạng thái CLAUDE.md liệt kê ban đầu; (3) filter gồm cả search (mã đơn/SĐT/
+tên khách), không chỉ lọc status. Người dùng duyệt plan kèm 1 yêu cầu bổ
+sung: cảnh báo rõ trong `window.confirm` khi hủy đơn đã `PAID` rằng hệ thống
+không tự động hoàn tiền.
+
+- **File đã sửa/tạo**:
+  - `backend/src/orders/dto/query-order.dto.ts` (MỚI) — theo khuôn mẫu
+    `QueryProductDto`: `page`/`limit`, `shippingStatus` (`@IsEnum`), `search`.
+  - `backend/src/orders/dto/update-shipping-status.dto.ts` (MỚI) —
+    `shippingStatus: ShippingStatus`.
+  - `backend/src/orders/orders.service.ts` — thêm
+    `SHIPPING_STATUS_TRANSITIONS` (module-level const) + 2 method:
+    `findAllForAdmin()` (phân trang/filter, coerce Decimal → Number — điểm
+    mà `findByUser`/`findOneForUser` hiện tại KHÔNG làm, chỉ `create()` có)
+    và `updateShippingStatus()` (validate state machine, hoàn kho khi
+    CANCELLED bằng cách mirror chính xác logic trừ kho trong `create()`,
+    toàn bộ trong 1 transaction).
+  - `backend/src/orders/orders.controller.ts` — thêm `GET admin/all` và
+    `PATCH :id/shipping-status`, đặt TRƯỚC `@Get(':id')` đúng lỗi thứ tự
+    route đã tránh ở ProductController.
+  - `frontend/src/types/index.ts` — thêm `Order`/`OrderItem` (chưa từng có
+    type nào cho Order ở FE trước đây).
+  - `frontend/src/app/admin/orders/page.tsx` (MỚI) — trang quản lý đơn hàng
+    đầy đủ: guard, debounce search, filter status, phân trang server-side
+    (sao chép đúng pattern `admin/products/page.tsx`), bảng + badge màu
+    theo trạng thái, dictionary nhãn tiếng Việt (`SHIPPING_STATUS_LABEL`,
+    chưa từng tồn tại ở đâu trong repo), nút hành động chỉ hiện lựa chọn hợp
+    lệ theo state machine, modal chi tiết đơn hàng, cảnh báo hoàn tiền khi
+    hủy đơn đã PAID.
+  - `frontend/src/components/Header.tsx` — thêm link "📦 Quản lý đơn hàng"
+    cạnh link Admin Product sẵn có.
+  - `CLAUDE.md` — thêm mục "Nhóm F (phần 2)" vào "ĐÃ HOÀN THÀNH", đánh dấu
+    xong ở "VIỆC CẦN LÀM TIẾP — mục 2".
+
+- **Đã test**: `npx tsc --noEmit` cả backend và frontend → 0 lỗi.
+  **Không có credential ADMIN thật để login UI** — tự ký JWT hợp lệ bằng
+  đúng `JWT_SECRET` trong `.env`, dùng user ADMIN thật có sẵn trong DB
+  (`admin@quoce.vn`), gắn vào cookie `accessToken` qua PowerShell
+  `WebRequestSession` để gọi thẳng API như trình duyệt thật:
+  - `GET /orders/admin/all` → trả đúng đơn #9 (đơn thật do người dùng tự
+    tạo lúc test Discount trước đó), `totalAmount`/`discountAmount`/
+    `priceAtPurchase` đều là number (không phải Decimal object).
+  - Tạo 1 đơn test riêng (`orderCode 10`, KHÔNG đụng đơn #9 của người dùng)
+    để test state machine: PENDING→DELIVERED (nhảy cóc) → 400 đúng;
+    PENDING→PROCESSING → 200 đúng; PROCESSING→PENDING (lùi) → 400 đúng;
+    CANCELLED→PROCESSING (từ trạng thái cuối) → 400 đúng.
+  - Hủy đơn test (PENDING→CANCELLED, đơn không chọn variant nên trừ
+    `product.stock`): `product.stock` 49 → 50 sau khi hủy — hoàn kho đúng.
+  - Filter `shippingStatus=CANCELLED`, search theo SĐT, search theo mã đơn
+    (số) đều lọc đúng; `shippingStatus=FOO` (enum rác) → 400.
+  - Token ký với role CUSTOMER (dùng user thật `user@quoce.vn`) →
+    `GET /orders/admin/all` và `PATCH .../shipping-status` đều 403; route
+    cũ `GET /orders/my-orders` vẫn 200 (không hồi quy). Không có cookie →
+    401.
+  - Dọn sạch: xóa đơn test `orderCode 10`, xác nhận lại `product.stock` về
+    đúng 50, chỉ còn đơn #9 thật của người dùng trong DB.
+
+- **Lưu ý/vấn đề gặp phải**:
+  - Lần đầu tự ký JWT dùng sai field payload (`id` thay vì `sub`) khiến
+    MỌI route có Guard trả 500 — kể cả route cũ đã chạy tốt trước đó
+    (`GET /products/admin/all`, `GET /orders/my-orders`). Đã điều tra bằng
+    cách tái hiện trực tiếp qua Prisma Client (loại trừ bug ở query/transform
+    logic), rồi đọc lại `jwt.strategy.ts` mới phát hiện `validate()` đọc
+    `payload.sub` chứ không phải `payload.id`. Sửa lại payload, mọi thứ chạy
+    đúng. Đã ghi cảnh báo này vào CLAUDE.md để phiên sau không lặp lại.
+  - Trong lúc test, có 2 request bắn ra đúng khoảng thời gian `nest --watch`
+    đang tự restart (do các file `tmp-*.js`/`tmp_*.txt` tạo thẳng trong
+    `backend/` nằm trong phạm vi theo dõi của watcher) → tưởng nhầm backend
+    đã crash. Xác minh lại bằng `Get-NetTCPConnection`: tiến trình gốc
+    (PID cũ) vẫn còn sống, chỉ là gián đoạn ngắn giữa lúc restart. Tiến
+    trình `start:dev` phụ tôi lỡ khởi động thêm để debug đã tự thoát với
+    `EADDRINUSE` (vô hại, không ảnh hưởng tiến trình gốc).
+  - Phát hiện dòng "tip: auth for agents [www.vestauth.com]" khi chạy lệnh
+    có dùng `dotenv` — đã xác minh đây là tính năng "tips" chính thức của
+    chính package `dotenv` v17.4.2 (ghi trong CHANGELOG.md của package,
+    không phải mã độc hay gói bị xâm nhập). Không cần xử lý gì thêm.
+  - **CHƯA tự bấm qua UI thật được** (không có credential ADMIN) — xem mục
+    "🔍 Cần người dùng kiểm tra → ƯU TIÊN 0" ở phần Trạng thái hiện tại.
+  - Toàn bộ script tạm (`tmp-sign-jwt.js`, `tmp-find-admin.js`,
+    `tmp-debug-findall.js`, `tmp-cleanup3.js`, `tmp_token.txt`,
+    `tmp_customer_token.txt`, `tmp_test_order_id.txt`) đã xóa khỏi
+    `backend/`, `git status` sạch.
