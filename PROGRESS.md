@@ -14,7 +14,7 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-08-29)*
+*(cập nhật lần cuối: 2026-08-30)*
 
 ### Đang làm / Việc tiếp theo ngay
 **✅ Nhóm F (phần 1) — Discount thật vào `OrdersService.create()` ĐÃ XONG**
@@ -22,6 +22,32 @@
 
 **✅ Nhóm F (phần 2) — Trang quản lý đơn hàng Admin (`/admin/orders`) ĐÃ
 ĐÓNG HOÀN TOÀN** — người dùng test UI thật PASS 6/6 bước (2026-08-29).
+
+**✅ Nhóm F — AuditLog (ghi vết action nhạy cảm Admin) ĐÃ ĐÓNG HOÀN TOÀN
+(2026-08-30, commit `c16eff3`).** Migration thêm `entityType`/`entityId`/
+`metadata`/index `createdAt` vào bảng `AuditLog` (chỉ ADD COLUMN, an toàn).
+`AuditLogInterceptor` (đăng ký qua `APP_INTERCEPTOR`) + decorator `@Audit()`
+gắn vào đúng 8 route nhạy cảm: `CREATE/UPDATE/DELETE_PRODUCT`,
+`UPDATE_ORDER_SHIPPING_STATUS`, `CREATE/DELETE_BRAND`,
+`CREATE/DELETE_SUB_CATEGORY`, `CHANGE_PASSWORD`, `UPLOAD_IMAGE`. Ghi cả
+action THẤT BẠI (qua `catchError`), redact mật khẩu/token trong `metadata`,
+không chặn response nếu ghi log lỗi. Kèm theo: sửa bug thứ tự ưu tiên
+`x-forwarded-for` (helper `getRequestMeta()` dùng chung, thay method private
+trùng lặp trong `AuthController`), bật `app.set('trust proxy', 1)` trong
+`main.ts` (cần thiết khi deploy sau proxy — ảnh hưởng cả IP ghi log lẫn
+`ThrottlerGuard`). Verify bằng script Node tự ký JWT ADMIN + gọi API thật:
+**5/5 ca PASS** (thành công có log đúng userId/entityType/entityId/metadata,
+thất bại vẫn có log kèm `metadata.success=false`, tạo mới lấy đúng
+`entityId` từ response, redact mật khẩu đúng, route không gắn decorator
+không sinh log thừa). `tsc --noEmit` sạch, response format các route không
+audit không đổi (đã kiểm tra regression). Dữ liệu test đã dọn sạch hoàn
+toàn, `audit_logs` về lại rỗng đúng như trước khi bắt đầu.
+⚠️ Phạm vi cố ý: CHỈ ghi log, CHƯA có API `GET /audit-logs` hay trang Admin
+xem log — làm sau, là việc riêng.
+⚠️ CLAUDE.md nhắc "xóa User" nhưng endpoint đó KHÔNG tồn tại;
+`DiscountsController` cũng chưa có route create/update/delete nào (discount
+đang seed tay) — hai mục này sẽ tự được gắn `@Audit()` khi nào endpoint
+được viết, không phải bỏ sót.
 
 **✅ ĐÃ THÊM 18 sản phẩm DEMO** để test trực quan Phân trang/Filter (Nhóm B),
 2026-08-29. Script additive-only (`backend/prisma/seed-demo-products.ts`),
@@ -34,9 +60,9 @@ go-live** bằng:
 await prisma.product.deleteMany({ where: { title: { startsWith: '[DEMO] ' } } });
 ```
 
-Việc tiếp theo trong Nhóm F: bảng AuditLog, cảnh báo tồn kho thấp (CLAUDE.md
-mục "VIỆC CẦN LÀM TIẾP — mục 2"). Ngoài ra còn hàng đợi riêng "Cải thiện UX
-form Thêm/Sửa sản phẩm Admin" (mục 2b trong CLAUDE.md) — làm sau.
+Việc tiếp theo trong Nhóm F: cảnh báo tồn kho thấp (CLAUDE.md mục "VIỆC CẦN
+LÀM TIẾP — mục 2"). Ngoài ra còn hàng đợi riêng "Cải thiện UX form Thêm/Sửa
+sản phẩm Admin" (mục 2b trong CLAUDE.md) — làm sau.
 
 **✅ Bug UX message lỗi áp mã giảm giá — ĐÃ ĐÓNG HOÀN TOÀN 2026-08-29.**
 Người dùng test UI thật PASS cả 2 ca: mã `QUOCE10` (hết lượt) và `ABCXYZ`
@@ -631,3 +657,83 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
      xuyên suốt, `totalAmount` cuối đúng đã trừ giảm giá.
 - **Lưu ý/vấn đề gặp phải**: Không có. Cả 2 mục đóng dứt điểm, không còn nợ
   gì ở phần Discount/Nhóm F (phần 1).
+
+### [2026-08-30] Đã hoàn thành: AuditLog — ghi vết action nhạy cảm Admin (Nhóm F)
+
+- **File mới**:
+  - `backend/src/common/decorators/audit.decorator.ts` — `@Audit(action, entityType?)`,
+    cùng khuôn mẫu `SetMetadata` + `reflector.getAllAndOverride` như `@Roles()`.
+  - `backend/src/common/interceptors/audit-log.interceptor.ts` — interceptor
+    ĐẦU TIÊN của dự án. Bỏ qua ngay (`return next.handle()`) nếu route không
+    có `@Audit()` — không đụng response, không bao trùm toàn cục (khác hẳn
+    TransformInterceptor đã bị rút lại trước đây). Dùng `tap()` cho ca thành
+    công (lấy `entityId` từ `req.params.id`, fallback từ `response.id`/
+    `response.data.id`), `catchError()` cho ca thất bại (ghi
+    `metadata.success=false` + `errorMessage`, rồi `throw` lại nguyên lỗi).
+    Ghi log qua `void this.write(...)` không chặn response; lỗi ghi log tự
+    nuốt + log qua nestjs-pino Logger. Redact `password`/`newPassword`/
+    `oldPassword`/`currentPassword`/`confirmPassword`/`token`/`accessToken`/
+    `refreshToken`/`cccd` trong `metadata.body` trước khi ghi DB.
+  - `backend/src/common/utils/request-meta.ts` — `getRequestMeta(req)` dùng
+    chung, sửa bug thứ tự ưu tiên IP (`x-forwarded-for` giờ ưu tiên trước
+    `req.ip`, vì `req.ip` gần như luôn truthy nên nhánh sau nó trước đây
+    không bao giờ chạy tới).
+- **File sửa**:
+  - `backend/prisma/schema.prisma` — model `AuditLog` thêm `entityType`,
+    `entityId`, `metadata Json?`, index `createdAt`. Migration
+    `20260829171737_add_audit_log_details` — chỉ ADD COLUMN + CREATE INDEX,
+    không mất dữ liệu (bảng đang rỗng).
+  - `backend/src/app.module.ts` — đăng ký `AuditLogInterceptor` qua
+    `APP_INTERCEPTOR` (cạnh `APP_GUARD: ThrottlerGuard` sẵn có).
+  - `backend/src/main.ts` — thêm `app.set('trust proxy', 1)`. Trước đó
+    hoàn toàn chưa có — khi deploy sau proxy (Nhóm E), `req.ip` sẽ là IP của
+    proxy chứ không phải client thật, ảnh hưởng cả audit log lẫn
+    `ThrottlerGuard` (rate-limit theo IP sẽ gộp nhầm mọi client).
+  - `backend/src/auth/auth.controller.ts` — xóa method private
+    `getRequestMeta()` trùng lặp, chuyển dùng helper chung.
+  - Gắn `@Audit()` vào đúng 8 route: `product.controller.ts` (create/update/
+    remove), `orders.controller.ts` (updateShippingStatus),
+    `brands.controller.ts` (create/remove), `sub-categories.controller.ts`
+    (create/remove), `users.controller.ts` (changePassword),
+    `cloudinary.controller.ts` (uploadFile).
+- **Đã test**: `npx tsc --noEmit` sạch. Viết script Node tạm (tự ký JWT
+  ADMIN bằng đúng `JWT_SECRET`, gọi API thật qua `fetch`, đọc trực tiếp bảng
+  `audit_logs` qua Prisma) chạy 5 ca, cả 5 PASS:
+  1. Ca thành công (`PATCH /orders/:id/shipping-status` hợp lệ) — có đúng 1
+     bản ghi, `userId`/`entityType`/`entityId` khớp, `metadata.body` đúng.
+  2. Ca thất bại (nhảy cóc trạng thái, bị state machine chặn 400) — VẪN có
+     bản ghi, `metadata.success=false` + có `errorMessage`, response client
+     vẫn đúng 400 như cũ (interceptor không làm méo lỗi).
+  3. Ca tạo mới (`POST /brands`) — `entityId` lấy đúng từ response (không
+     có `req.params.id`).
+  4. Ca redact (`PATCH /users/:id/password` trên user test tự tạo) —
+     `metadata.body.oldPassword`/`newPassword` đều là `"[REDACTED]"`, không
+     lộ mật khẩu thật dưới bất kỳ dạng nào.
+  5. Ca không log (`GET /products`) — xác nhận route không có `@Audit()`
+     không sinh bản ghi nào.
+  - Regression: `GET /products`, `GET /brands`, `GET /health` vẫn trả đúng
+    format cũ, không bị interceptor đụng vào.
+  - Dữ liệu test (1 đơn hàng, 1 brand, 1 user, và các bản ghi `audit_logs`
+    phát sinh) đã dọn sạch hoàn toàn — `audit_logs` về lại rỗng đúng như
+    trước khi bắt đầu, `Order`/`Brand` count về đúng baseline.
+- **Lưu ý/vấn đề gặp phải**:
+  - **Race condition trong CHÍNH SCRIPT TEST** (không phải bug thật của
+    interceptor): `void this.write(...)` là fire-and-forget, nên query DB
+    ngay sau khi HTTP response trả về đôi khi chưa thấy bản ghi kịp ghi
+    xong. Sửa bằng cách thêm `wait(500ms)` sau mỗi lệnh mutate trước khi
+    kiểm tra — sau đó cả 5 ca đều PASS ổn định. Cũng phát hiện thêm 1 bug
+    tương tự trong logic dọn dẹp của chính script (xóa `user` trước khiến
+    `onDelete: SetNull` xóa `userId` trên log trước khi filter cleanup theo
+    `userId` kịp chạy, để sót 1 dòng — đã sửa cleanup lọc theo `entityId`
+    thay vì `userId`, và dọn tay dòng sót lại).
+  - **Port 5000 bị 1 process node khác chiếm** trong lúc chuẩn bị test
+    (2 lần: PID `44008` rồi `2464`) — cả 2 lần đều được người dùng xác nhận
+    an toàn để `taskkill` trước khi restart server với code mới.
+  - **CHECKPOINT — hết usage đột ngột giữa phiên**: sau khi báo "5/5 ca
+    PASS, cleanup xong, tsc sạch" nhưng CHƯA KỊP tự `git commit`, phiên bị
+    ngắt do hết usage. Người dùng tự chạy tay
+    `git add . && git commit && git push` dựa đúng trên báo cáo, tạo commit
+    `c16eff3` (không có trailer `Co-Authored-By` vì không phải Claude tự
+    commit). Phiên sau đã xác nhận lại: đọc nguyên văn 3 file mới + diff
+    toàn bộ file đã sửa trong commit, khớp 100% với plan đã duyệt — commit
+    hợp lệ, không phải bất thường.
