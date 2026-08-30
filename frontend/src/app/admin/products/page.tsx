@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -81,6 +81,18 @@ function getStockBadge(stock: number): { label: string; className: string } | nu
   return null;
 }
 
+// ⚡ UX form Admin (mục 2b) — trích ra dùng chung cho modal quick-add
+// SubCategory/Brand, thay vì lặp lại 2 lần như code cũ.
+function generateSlugFromName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 export default function AdminProductsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -114,6 +126,19 @@ export default function AdminProductsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  // ⚡ UX form Admin (mục 2b): khóa nút Submit trong lúc lưu, tránh double-submit
+  const [submitting, setSubmitting] = useState(false);
+  // ⚡ UX form Admin (mục 2b): mini-modal quick-add SubCategory/Brand, thay
+  // window.prompt() thô. `submitting` riêng cho mini-modal này.
+  const [quickAddModal, setQuickAddModal] = useState<{
+    type: 'subCategory' | 'brand';
+    name: string;
+    logoUrl: string;
+    submitting: boolean;
+  } | null>(null);
+  // ⚡ UX form Admin (mục 2b): snapshot formData lúc mở modal, để cảnh báo
+  // mất dữ liệu nếu đóng modal mà có thay đổi chưa lưu.
+  const [initialFormDataSnapshot, setInitialFormDataSnapshot] = useState('');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -137,6 +162,18 @@ export default function AdminProductsPage() {
   // ⚡ MỚI: SubCategory hiển thị trong dropdown phải lọc theo Category đang
   // chọn — đây chính là "dropdown phụ thuộc" đúng tinh thần MDM.
   const filteredSubCategories = subCategories.filter((sc) => sc.categoryId === formData.categoryId);
+
+  // ⚡ UX form Admin (mục 2b): validate JSON specsText NGAY KHI GÕ, không đợi
+  // tới lúc Submit mới báo lỗi. handleSubmit vẫn giữ nguyên try/catch JSON.parse
+  // làm lớp chặn cuối cùng (phòng khi giá trị này chưa kịp cập nhật).
+  const specsError = useMemo(() => {
+    try {
+      JSON.parse(formData.specsText || '{}');
+      return null;
+    } catch (e: any) {
+      return e.message as string;
+    }
+  }, [formData.specsText]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -235,7 +272,26 @@ export default function AdminProductsPage() {
     }
   }, [authLoading, user, fetchProducts]);
 
-  // ⚡ Thuật toán sinh Slug và SKU an toàn, chống tràn khi tên quá dài
+  // ⚡ UX form Admin (mục 2b) — trích SKU-gen ra hàm thuần, dùng chung cho
+  // handleTitleChange (tự động khi gõ Tên) VÀ nút "Sinh lại mã khác" (khi
+  // đổi Brand sau khi đã gõ Tên — bug cũ: SKU không cập nhật lại prefix).
+  const generateSku = (title: string, brandId: string): string => {
+    const slugForSku = title
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/([^0-9a-z-\s])/g, '')
+      .replace(/(\s+)/g, '-');
+    const shortSlugPart = slugForSku.split('-').slice(0, 3).join('-').slice(0, 12).toUpperCase();
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const selectedBrand = brands.find((b) => b.id === brandId);
+    const brandPrefix = (selectedBrand?.slug || 'GEN').toUpperCase();
+    return `QUO-${brandPrefix}-${shortSlugPart}-${randomSuffix}`;
+  };
+
+  // ⚡ Thuật toán sinh Slug an toàn, chống tràn khi tên quá dài. SKU giờ tách
+  // riêng qua generateSku() ở trên (ô SKU đã readOnly, không còn gõ tay được).
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const title = e.target.value;
     const generatedSlug = title
@@ -246,20 +302,11 @@ export default function AdminProductsPage() {
       .replace(/([^0-9a-z-\s])/g, '')
       .replace(/(\s+)/g, '-');
 
-    const shortSlugPart = generatedSlug.split('-').slice(0, 3).join('-').slice(0, 12).toUpperCase();
-    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-
-    // ⚡ FIX: tra brand.slug từ danh sách `brands` đã load, thay vì đọc
-    // formData.brandSlug (field đã bị xóa khỏi state ở Phase 1).
-    const selectedBrand = brands.find((b) => b.id === formData.brandId);
-    const brandPrefix = (selectedBrand?.slug || 'GEN').toUpperCase();
-    const generatedSku = `QUO-${brandPrefix}-${shortSlugPart}-${randomSuffix}`;
-
-    setFormData(prev => ({ 
-      ...prev, 
-      title, 
+    setFormData(prev => ({
+      ...prev,
+      title,
       slug: generatedSlug,
-      sku: generatedSku 
+      sku: generateSku(title, prev.brandId),
     }));
   };
 
@@ -283,39 +330,34 @@ export default function AdminProductsPage() {
     }));
   };
 
-  // ⚡ MỚI: Quick-add SubCategory ngay trong modal, không phải rời trang
-  const handleQuickAddSubCategory = async () => {
-    if (!formData.categoryId) {
-      alert('Vui lòng chọn Danh mục chính trước.');
-      return;
-    }
-    const name = window.prompt('Tên danh mục con mới (VD: Tai nghe):');
+  // ⚡ UX form Admin (mục 2b) — thay window.prompt() thô bằng modal quick-add
+  // đàng hoàng (state quickAddModal, JSX render ở cuối file). Nút "+ Thêm
+  // mới" chỉ mở/đóng mini-modal lồng bên trong, hàm dưới đây submit thật.
+  const handleQuickAddSubmit = async () => {
+    if (!quickAddModal) return;
+    const name = quickAddModal.name.trim();
     if (!name) return;
-    const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = generateSlugFromName(name);
+    setQuickAddModal(prev => (prev ? { ...prev, submitting: true } : prev));
 
     try {
-      const res = await api.post('/sub-categories', { name, slug, categoryId: formData.categoryId });
-      setSubCategories(prev => [...prev, res.data]);
-      setFormData(prev => ({ ...prev, subCategoryId: res.data.id }));
-      setMessage({ type: 'success', text: `Đã tạo danh mục con "${name}" thành công!` });
+      if (quickAddModal.type === 'subCategory') {
+        const res = await api.post('/sub-categories', { name, slug, categoryId: formData.categoryId });
+        setSubCategories(prev => [...prev, res.data]);
+        setFormData(prev => ({ ...prev, subCategoryId: res.data.id }));
+        setMessage({ type: 'success', text: `Đã tạo danh mục con "${name}" thành công!` });
+      } else {
+        const payload: { name: string; slug: string; logoUrl?: string } = { name, slug };
+        if (quickAddModal.logoUrl.trim()) payload.logoUrl = quickAddModal.logoUrl.trim();
+        const res = await api.post('/brands', payload);
+        setBrands(prev => [...prev, res.data]);
+        setFormData(prev => ({ ...prev, brandId: res.data.id }));
+        setMessage({ type: 'success', text: `Đã tạo thương hiệu "${name}" thành công!` });
+      }
+      setQuickAddModal(null);
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể tạo danh mục con.' });
-    }
-  };
-
-  // ⚡ MỚI: Quick-add Brand ngay trong modal
-  const handleQuickAddBrand = async () => {
-    const name = window.prompt('Tên thương hiệu mới (VD: Anker):');
-    if (!name) return;
-    const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
-    try {
-      const res = await api.post('/brands', { name, slug });
-      setBrands(prev => [...prev, res.data]);
-      setFormData(prev => ({ ...prev, brandId: res.data.id }));
-      setMessage({ type: 'success', text: `Đã tạo thương hiệu "${name}" thành công!` });
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể tạo thương hiệu.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể tạo mới.' });
+      setQuickAddModal(prev => (prev ? { ...prev, submitting: false } : prev));
     }
   };
 
@@ -422,13 +464,24 @@ export default function AdminProductsPage() {
       });
       const url = res.data.url;
 
-      const updatedVariants = [...formData.variants];
-      updatedVariants[variantIndex] = {
-        ...updatedVariants[variantIndex],
-        images: [...(updatedVariants[variantIndex].images || []), url]
-      };
-
-      setFormData(prev => ({ ...prev, variants: updatedVariants }));
+      // 🛡️ FIX BUG (mục 2b, phát hiện qua test tay): tính updatedVariants từ
+      // `formData.variants` (đọc từ closure ngoài) thay vì `prev.variants`
+      // trong functional updater khiến ảnh thứ 2 trở đi cho CÙNG 1 variant bị
+      // GHI ĐÈ thay vì append — nếu 2 lượt upload cùng variant chồng lấn thời
+      // gian (upload sau resolve trong khi state của upload trước chưa kịp
+      // render lại), lượt sau đọc lại đúng mảng images CŨ (chưa có ảnh 1) rồi
+      // set đè, mất luôn ảnh vừa thêm dù Cloudinary đã lưu cả 2 (thấy đủ 2
+      // ảnh trong folder, chỉ UI hiển thị thiếu). Luôn tính trên `prev` —
+      // React đảm bảo các functional updater áp dụng tuần tự trên state mới
+      // nhất, không bao giờ mất update dù có đua race.
+      setFormData(prev => {
+        const updatedVariants = [...prev.variants];
+        updatedVariants[variantIndex] = {
+          ...updatedVariants[variantIndex],
+          images: [...(updatedVariants[variantIndex].images || []), url],
+        };
+        return { ...prev, variants: updatedVariants };
+      });
       setMessage({ type: 'success', text: `TẢI ẢNH CHO BIẾN THỂ [${colorCode.toUpperCase()}] THÀNH CÔNG!` });
     } catch (err) {
       setMessage({ type: 'error', text: 'Không thể tải ảnh biến thể màu.' });
@@ -436,9 +489,16 @@ export default function AdminProductsPage() {
   };
 
   const handleRemoveVariantImage = (variantIndex: number, imgIndex: number) => {
-    const updatedVariants = [...formData.variants];
-    updatedVariants[variantIndex].images = updatedVariants[variantIndex].images.filter((_, i) => i !== imgIndex);
-    setFormData(prev => ({ ...prev, variants: updatedVariants }));
+    // Cùng nguyên tắc fix ở trên — tính trên `prev.variants`, không đọc
+    // `formData.variants` từ closure ngoài.
+    setFormData(prev => {
+      const updatedVariants = [...prev.variants];
+      updatedVariants[variantIndex] = {
+        ...updatedVariants[variantIndex],
+        images: updatedVariants[variantIndex].images.filter((_, i) => i !== imgIndex),
+      };
+      return { ...prev, variants: updatedVariants };
+    });
   };
 
   const handleAddVariant = () => {
@@ -486,7 +546,7 @@ export default function AdminProductsPage() {
   const handleOpenCreate = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({
+    const initial = {
       title: '',
       slug: '',
       sku: '',
@@ -498,22 +558,24 @@ export default function AdminProductsPage() {
       originalPrice: '',
       stock: '50',
       thumbnail: '',
-      images: [],
+      images: [] as string[],
       isActive: true,
       variants: [
         { colorCode: 'black', colorName: 'Đen nhám', hexCode: '#111111', price: 0, stock: 25, images: [] },
         { colorCode: 'white', colorName: 'Trắng sứ', hexCode: '#FFFFFF', price: 0, stock: 25, images: [] }
-      ],
+      ] as Variant[],
       highlightsText: '• Công nghệ sạc nhanh PD 65W\n• Dung lượng thực tế 20000mAh\n• Màn hình LED hiển thị % pin',
       specsText: '{\n  "material": "Aluminum Alloy",\n  "input": "Type-C 65W",\n  "output": "Dual Type-C + USB-A"\n}',
-    });
+    };
+    setFormData(initial);
+    setInitialFormDataSnapshot(JSON.stringify(initial)); // ⚡ UX (mục 2b): snapshot cho cảnh báo đóng modal chưa lưu
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (product: Product) => {
     setIsEditing(true);
     setCurrentId(product.id);
-    setFormData({
+    const initial = {
       title: product.title,
       slug: product.slug,
       sku: product.sku || '',
@@ -530,13 +592,26 @@ export default function AdminProductsPage() {
       variants: product.variants || [],
       highlightsText: Array.isArray(product.highlights) ? product.highlights.join('\n') : '',
       specsText: product.specs ? JSON.stringify(product.specs, null, 2) : '{}',
-    });
+    };
+    setFormData(initial);
+    setInitialFormDataSnapshot(JSON.stringify(initial)); // ⚡ UX (mục 2b): snapshot cho cảnh báo đóng modal chưa lưu
     setIsModalOpen(true);
+  };
+
+  // ⚡ UX form Admin (mục 2b): đóng modal có xác nhận nếu formData đã đổi so
+  // với lúc mở — tránh Admin lỡ tay mất dữ liệu đã gõ. So sánh bằng
+  // JSON.stringify vì formData không chứa function/Date, đủ tin cậy ở đây.
+  const handleCloseModal = () => {
+    if (JSON.stringify(formData) !== initialFormDataSnapshot) {
+      if (!window.confirm('Bạn có thay đổi chưa lưu. Đóng mà không lưu?')) return;
+    }
+    setIsModalOpen(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
+    setSubmitting(true); // ⚡ UX (mục 2b): khóa nút Submit, tránh double-submit
 
     try {
       // Parse highlights từ textarea (mỗi dòng là một phần tử mảng)
@@ -604,6 +679,8 @@ export default function AdminProductsPage() {
       fetchProducts();
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Đã có lỗi hệ thống xảy ra.' });
+    } finally {
+      setSubmitting(false); // ⚡ UX (mục 2b)
     }
   };
 
@@ -881,8 +958,8 @@ export default function AdminProductsPage() {
                 <h2 className="text-sm font-black uppercase tracking-widest text-black">
                   {isEditing ? 'CHỈNH SỬA SẢN PHẨM ENTERPRISE' : 'THÊM SẢN PHẨM MỚI (PIM)'}
                 </h2>
-                <button 
-                  onClick={() => setIsModalOpen(false)}
+                <button
+                  onClick={handleCloseModal}
                   className="text-xs font-bold uppercase px-3 py-1 bg-gray-100 hover:bg-black hover:text-white transition"
                 >
                   ✕ Đóng
@@ -906,14 +983,27 @@ export default function AdminProductsPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Mã SKU tự động</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Mã SKU tự động</label>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, sku: generateSku(prev.title, prev.brandId) }))}
+                        disabled={!formData.title}
+                        className="text-[10px] font-bold text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
+                      >
+                        ↻ Sinh lại mã khác
+                      </button>
+                    </div>
+                    {/* ⚡ UX (mục 2b): readOnly hẳn (không còn sửa tay được) — trước đây
+                        style trông như read-only nhưng vẫn gõ được, gây nhầm lẫn. */}
                     <input
                       type="text"
                       name="sku"
                       required
+                      readOnly
                       value={formData.sku}
-                      onChange={handleChange}
-                      className="bg-gray-100 border border-gray-300 text-gray-700 font-mono text-xs px-4 py-3 rounded-none"
+                      placeholder="Sẽ tự sinh khi nhập Tên sản phẩm"
+                      className="bg-gray-100 border border-gray-300 text-gray-700 font-mono text-xs px-4 py-3 rounded-none cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -964,8 +1054,10 @@ export default function AdminProductsPage() {
                       <label className="text-[10px] font-bold uppercase text-gray-600">Danh mục con (SubCategory)</label>
                       <button
                         type="button"
-                        onClick={handleQuickAddSubCategory}
-                        className="text-[10px] font-bold text-blue-600 hover:underline"
+                        onClick={() => setQuickAddModal({ type: 'subCategory', name: '', logoUrl: '', submitting: false })}
+                        disabled={!formData.categoryId}
+                        title={!formData.categoryId ? 'Chọn Danh mục chính trước' : undefined}
+                        className="text-[10px] font-bold text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
                       >
                         + Thêm mới
                       </button>
@@ -992,7 +1084,7 @@ export default function AdminProductsPage() {
                       <label className="text-[10px] font-bold uppercase text-gray-600">Thương hiệu (Brand)</label>
                       <button
                         type="button"
-                        onClick={handleQuickAddBrand}
+                        onClick={() => setQuickAddModal({ type: 'brand', name: '', logoUrl: '', submitting: false })}
                         className="text-[10px] font-bold text-blue-600 hover:underline"
                       >
                         + Thêm mới
@@ -1130,8 +1222,14 @@ export default function AdminProductsPage() {
                       value={formData.specsText}
                       onChange={handleChange}
                       placeholder='{"material": "Aluminum", "weight": "340g"}'
-                      className="bg-white border border-gray-300 text-black font-mono text-xs px-4 py-3 rounded-none focus:outline-none focus:border-black"
+                      aria-invalid={!!specsError}
+                      className={`bg-white border text-black font-mono text-xs px-4 py-3 rounded-none focus:outline-none ${
+                        specsError ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-black'
+                      }`}
                     />
+                    {specsError && (
+                      <p className="text-red-600 text-[10px] font-bold">⚠ JSON không hợp lệ: {specsError}</p>
+                    )}
                   </div>
                 </div>
 
@@ -1159,7 +1257,11 @@ export default function AdminProductsPage() {
                             <th className="p-3">Mã màu</th>
                             <th className="p-3">Tên hiển thị</th>
                             <th className="p-3">Mã HEX</th>
-                            <th className="p-3">Giá (VNĐ)</th>
+                            {/* ⚡ FIX wording (mục 2b, phát hiện qua test tay): "giá gốc" trùng tên
+                                với field "Giá gốc / Original Price" riêng biệt trên form, gây hiểu
+                                nhầm nghiêm trọng. Hành vi thật (product.service.ts backend) là fallback
+                                về field "Giá bán" (price), KHÔNG PHẢI "Giá gốc" (originalPrice). */}
+                            <th className="p-3" title="Để trống hoặc 0 sẽ dùng đúng Giá bán của sản phẩm chính">Giá (VNĐ)</th>
                             <th className="p-3">Kho</th>
                             <th className="p-3">Ảnh biến thể</th>
                             <th className="p-3 text-right">Thao tác</th>
@@ -1203,6 +1305,7 @@ export default function AdminProductsPage() {
                                   type="number"
                                   value={variant.price}
                                   onChange={(e) => handleVariantChange(index, 'price', parseFloat(e.target.value) || 0)}
+                                  placeholder="0 = dùng Giá bán chính"
                                   className="bg-white border border-gray-300 text-xs px-3 py-2 w-24"
                                 />
                               </td>
@@ -1268,21 +1371,89 @@ export default function AdminProductsPage() {
                 <div className="pt-4 flex items-center justify-end gap-4 border-t border-gray-200">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-6 py-3 bg-gray-200 text-black text-xs font-bold uppercase tracking-widest rounded-none hover:bg-gray-300 transition"
+                    onClick={handleCloseModal}
+                    disabled={submitting}
+                    className="px-6 py-3 bg-gray-200 text-black text-xs font-bold uppercase tracking-widest rounded-none hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Hủy bỏ
                   </button>
                   <button
                     type="submit"
-                    className="px-8 py-3 bg-black text-white text-xs font-bold uppercase tracking-widest rounded-none hover:bg-gray-800 transition shadow-md"
+                    disabled={submitting}
+                    className="px-8 py-3 bg-black text-white text-xs font-bold uppercase tracking-widest rounded-none hover:bg-gray-800 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isEditing ? 'LƯU THAY ĐỔI' : 'TẠO SẢN PHẨM ENTERPRISE'}
+                    {submitting ? 'ĐANG XỬ LÝ...' : (isEditing ? 'LƯU THAY ĐỔI' : 'TẠO SẢN PHẨM ENTERPRISE')}
                   </button>
                 </div>
 
               </form>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⚡ UX form Admin (mục 2b): mini-modal quick-add SubCategory/Brand,
+          thay window.prompt() thô. Lồng trên modal Sản phẩm (z-[60] > z-50). */}
+      {quickAddModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] overflow-y-auto px-4 py-10 flex items-center justify-center">
+          <div className="bg-white border border-gray-300 w-full max-w-md p-6 rounded-none shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
+              <h3 className="text-xs font-black uppercase tracking-widest text-black">
+                {quickAddModal.type === 'subCategory' ? 'Thêm danh mục con mới' : 'Thêm thương hiệu mới'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setQuickAddModal(null)}
+                className="text-xs font-bold uppercase px-3 py-1 bg-gray-100 hover:bg-black hover:text-white transition"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
+                  {quickAddModal.type === 'subCategory' ? 'Tên danh mục con' : 'Tên thương hiệu'}
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={quickAddModal.name}
+                  onChange={(e) => setQuickAddModal(prev => (prev ? { ...prev, name: e.target.value } : prev))}
+                  placeholder={quickAddModal.type === 'subCategory' ? 'VD: Tai nghe' : 'VD: Anker'}
+                  className="bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3 rounded-none"
+                />
+              </div>
+              {quickAddModal.type === 'brand' && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Logo URL (tùy chọn)</label>
+                  <input
+                    type="text"
+                    value={quickAddModal.logoUrl}
+                    onChange={(e) => setQuickAddModal(prev => (prev ? { ...prev, logoUrl: e.target.value } : prev))}
+                    placeholder="https://..."
+                    className="bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3 rounded-none"
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickAddModal(null)}
+                  disabled={quickAddModal.submitting}
+                  className="px-4 py-2 bg-gray-200 text-black text-xs font-bold uppercase tracking-widest rounded-none hover:bg-gray-300 transition disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickAddSubmit}
+                  disabled={quickAddModal.submitting || !quickAddModal.name.trim()}
+                  className="px-6 py-2 bg-black text-white text-xs font-bold uppercase tracking-widest rounded-none hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {quickAddModal.submitting ? 'ĐANG TẠO...' : 'Tạo mới'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

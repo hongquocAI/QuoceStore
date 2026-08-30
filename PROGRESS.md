@@ -88,8 +88,52 @@ script test tạm đã xóa sạch.
 
 Nhóm F giờ đã hoàn tất toàn bộ các mục trong CLAUDE.md "VIỆC CẦN LÀM TIẾP —
 mục 2" (Discount, trang quản lý đơn hàng Admin, AuditLog, cảnh báo tồn kho
-thấp). Còn lại: hàng đợi riêng "Cải thiện UX form Thêm/Sửa sản phẩm Admin"
-(mục 2b CLAUDE.md, chưa code) — và các Nhóm D/E chưa bắt đầu.
+thấp).
+
+**✅ Mục 2b CLAUDE.md — UX form Thêm/Sửa sản phẩm Admin ĐÃ ĐÓNG HOÀN TOÀN
+(2026-08-30).** Làm đủ cả 6 việc liệt kê trong CLAUDE.md (mục 7 — chia
+tab/section — chủ động KHÔNG làm, đúng ghi chú "để sau khi catalog lớn").
+Chỉ sửa `frontend/src/app/admin/products/page.tsx`:
+1. Thay `window.prompt()` bằng mini-modal quick-add đàng hoàng (lồng
+   `z-[60]` trên modal chính `z-50`), Brand quick-add có thêm `logoUrl`.
+2. `handleCloseModal()` — `window.confirm` nếu `formData` đổi so với
+   snapshot lúc mở (so sánh `JSON.stringify`).
+3. Nút Submit khóa + hiện "ĐANG XỬ LÝ..." khi `submitting`, đúng pattern
+   `uploadingThumbnail` đã có.
+4. Ô SKU `readOnly` + nút "↻ Sinh lại mã khác" (sửa luôn bug: đổi Brand sau
+   khi gõ Title không cập nhật lại prefix SKU — trích `generateSku(title,
+   brandId)` thành hàm thuần dùng chung).
+5. Tooltip + placeholder ở cột "Giá (VNĐ)" biến thể giải thích quy ước
+   fallback.
+6. `specsError` (`useMemo`) validate JSON specsText ngay khi gõ, viền đỏ +
+   dòng lỗi inline dưới textarea.
+
+**🛡️ 2 bug thật phát hiện qua test tay, đã sửa cùng đợt:**
+- **Bug mất ảnh variant khi upload nhanh liên tiếp**: `handleVariantImageUpload`
+  và `handleRemoveVariantImage` tính mảng `images` mới từ `formData.variants`
+  đọc ở closure ngoài thay vì `prev.variants` trong functional updater — nếu
+  2 lượt upload ảnh cho CÙNG 1 variant chồng lấn thời gian (upload sau
+  resolve trong khi state của upload trước chưa kịp render lại), lượt sau
+  đọc lại mảng CŨ rồi set đè, mất ảnh vừa thêm dù Cloudinary đã lưu đủ (thấy
+  đủ ảnh trong folder, chỉ UI thiếu). Đã sửa cả 2 hàm tính trên `prev`.
+- **Wording tooltip/placeholder giá biến thể gây hiểu nhầm**: chữ "giá gốc"
+  trùng tên với field "Giá gốc/Original Price" riêng biệt trên form, trong
+  khi hành vi thật (backend) là fallback về "Giá bán" (`price`), không phải
+  "Giá gốc" (`originalPrice`). Đổi thành "Để trống hoặc 0 sẽ dùng đúng Giá
+  bán của sản phẩm chính".
+
+**🔍 Đã điều tra kỹ 1 nghi vấn bug KHÔNG PHẢI bug thật**: người dùng báo
+folder Cloudinary của ảnh variant lệch với thumbnail (thiếu Brand, rơi về
+"general"). Trace toán học thuật toán `getDynamicFolder` cho cả 5 tổ hợp
+thiếu/đủ Category+SubCategory+Brand xác nhận: không có nhánh logic riêng
+cho `type='variant'` — cùng 1 biểu thức tra cat/subCat/brand dùng chung cho
+cả 3 loại ảnh, luôn cho cùng thư mục cha nếu đọc tại CÙNG 1 thời điểm. Người
+dùng tự test lại có kiểm soát thứ tự (chọn đủ 3 dropdown TRƯỚC khi upload)
+→ khớp nhau hoàn toàn. Xác nhận nguyên nhân là **thứ tự thao tác** (upload
+ảnh trước khi hoàn tất dropdown, rồi đổi dropdown sau — ảnh cũ không tự cập
+nhật lại thư mục), không phải bug code. Xem known-issue mở rộng bên dưới.
+
+Việc còn lại: các Nhóm D/E chưa bắt đầu.
 
 **✅ Bug UX message lỗi áp mã giảm giá — ĐÃ ĐÓNG HOÀN TOÀN 2026-08-29.**
 Người dùng test UI thật PASS cả 2 ca: mã `QUOCE10` (hết lượt) và `ABCXYZ`
@@ -157,6 +201,43 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
   `products`. `orderBy: createdAt desc` mặc định và `search` (Prisma
   `contains`) hiện đang quét tuần tự. Chưa ảnh hưởng ở quy mô hiện tại (DB
   đang có rất ít sản phẩm) nhưng sẽ thành vấn đề thật khi catalog lớn.
+- **Upload ảnh (thumbnail/gallery/variant) tính thư mục Cloudinary NGAY lúc
+  chọn file, không tự cập nhật lại nếu Admin đổi Category/SubCategory/Brand
+  SAU KHI đã upload** (mở rộng từ ghi chú cũ chỉ nhắc SubCategory —
+  2026-08-30 xác nhận qua điều tra thực tế: cùng bản chất áp dụng cho CẢ 3
+  dropdown, không riêng SubCategory). Đã xác nhận bằng trace toán học +
+  người dùng tự test lại có kiểm soát thứ tự: `getDynamicFolder`
+  (`admin/products/page.tsx`) hoàn toàn nhất quán giữa thumbnail/gallery/
+  variant nếu đọc `formData` tại CÙNG 1 thời điểm — không phải bug logic.
+  Chấp nhận được ở quy mô hiện tại (Admin đơn lẻ, catalog nhỏ); nếu muốn
+  sửa triệt để phải đổi kiến trúc (hoãn upload thật tới lúc Submit, hoặc
+  chặn UI không cho upload cho tới khi đủ 3 dropdown).
+- **[HÀNG ĐỢI — Nhóm E, trước go-live] Cloudinary orphaned files**: ảnh bị
+  xóa khỏi form (đã lưu sản phẩm hay chưa) vẫn còn tồn trên Cloudinary,
+  không tự dọn — tích tụ file rác theo thời gian vì upload xảy ra ngay khi
+  chọn file, độc lập với việc sản phẩm có được lưu hay không. Cần viết
+  script garbage collection: quét toàn bộ ảnh trong
+  `quoce-store/products/...`, đối chiếu với URL thực sự đang được
+  `Product.thumbnail`/`images`/`ProductVariant.images` tham chiếu trong DB,
+  xóa ảnh không khớp. Chạy tay hoặc lên lịch định kỳ. Chưa cần làm ngay —
+  catalog còn nhỏ, Cloudinary free tier đủ dung lượng, rủi ro thấp ở giai
+  đoạn hiện tại.
+- **[HÀNG ĐỢI — không rõ mức ưu tiên]** Sửa Brand ở chế độ Edit mà không
+  bấm "↻ Sinh lại mã khác" → SKU giữ nguyên prefix cũ, không tự đồng bộ.
+  Chấp nhận được (đúng thiết kế "chủ động" — Admin có nút để tự sinh lại
+  khi cần), nhưng nên cân nhắc thêm cảnh báo nhỏ khi phát hiện SKU hiện tại
+  không khớp prefix Brand đang chọn.
+- **[HÀNG ĐỢI]** Ô `logoUrl` trong mini-modal quick-add Brand chưa validate
+  định dạng URL — nhập chuỗi bất kỳ vẫn submit được (backend
+  `CreateBrandDto.logoUrl` chỉ có `@IsOptional() @IsString()`, không
+  `@IsUrl()`).
+- **[HÀNG ĐỢI, phạm vi lớn — không code ngay]** Ô "Thông số kỹ thuật
+  (Specs - JSON Format)" đang bắt Admin gõ JSON thô — rào cản UX thật với
+  người không biết lập trình. Ý tưởng: thay bằng trình xây dựng key-value
+  động (danh sách hàng Tên thuộc tính/Giá trị + nút "+ Thêm dòng", tự ghép
+  thành JSON ở tầng submit, không đổi format lưu DB). Cần thiết kế riêng
+  (UI cho việc thêm/xóa/sắp xếp hàng, xử lý giá trị lồng nhau nếu có) —
+  không thuộc phạm vi đợt sửa UX vừa xong.
 
 ### 🔍 Cần người dùng kiểm tra (chưa tự verify được trong phiên này)
 
@@ -808,3 +889,87 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   duyệt, không phải lỗi code. Đây là bài học nhỏ: khi test UI qua người
   dùng bằng tooltip/hover, nên nhắc hard refresh trước nếu vừa sửa code
   ngay trước đó, tránh nhầm lẫn cache trình duyệt với bug thật.
+
+### [2026-08-30] Đã hoàn thành: UX form Thêm/Sửa sản phẩm Admin (CLAUDE.md mục 2b)
+
+- **File đã sửa**: CHỈ `frontend/src/app/admin/products/page.tsx` (đúng
+  phạm vi UX Frontend thuần túy đã chốt, không đụng backend/schema/API).
+  Làm đủ cả 6 việc CLAUDE.md liệt kê (mục 7 — chia tab/section — chủ động
+  không làm, đúng quyết định "để sau khi catalog lớn").
+  1. Mini-modal quick-add (`quickAddModal` state) thay `window.prompt()` ở
+     `handleQuickAddSubCategory`/`handleQuickAddBrand` cũ — gộp thành 1 hàm
+     `handleQuickAddSubmit` dùng chung, tái dùng helper `generateSlugFromName()`
+     trích ra (trước đó lặp lại y hệt 2 lần). Nút "+ Thêm mới" SubCategory
+     thêm `disabled={!formData.categoryId}` (thay `alert()` chặn cứng cũ).
+     Brand quick-add có thêm field `logoUrl` optional (xác nhận đúng field
+     name qua `CreateBrandDto`).
+  2. `initialFormDataSnapshot` (chụp lúc `handleOpenCreate`/`handleOpenEdit`)
+     + `handleCloseModal()` — `window.confirm` nếu `JSON.stringify(formData)`
+     khác snapshot. Áp cho nút "✕ Đóng" và "Hủy bỏ"; KHÔNG áp cho nhánh đóng
+     sau khi lưu thành công trong `handleSubmit` (bypass thẳng, dữ liệu đã
+     lưu rồi không cần hỏi).
+  3. State `submitting` — `setSubmitting(true)` đầu `handleSubmit`, thêm
+     `finally { setSubmitting(false) }` (trước đây chỉ có `catch`, không có
+     `finally`). Nút Submit + "Hủy bỏ" đều `disabled={submitting}`, label
+     đổi "ĐANG XỬ LÝ..." khi đang chạy.
+  4. Trích `generateSku(title, brandId)` thành hàm thuần (dùng closure
+     `brands`), gọi lại từ `handleTitleChange` VÀ nút mới "↻ Sinh lại mã
+     khác" — sửa bug thật: trước đây đổi Brand sau khi đã gõ Title không hề
+     cập nhật lại prefix SKU vì SKU chỉ tái sinh trong `handleTitleChange`.
+     Input SKU thêm `readOnly` (bỏ hẳn `onChange`), placeholder khi rỗng.
+  5. Tooltip header + `placeholder` cột "Giá (VNĐ)" biến thể giải thích quy
+     ước fallback (khớp `product.service.ts` dòng ~83: `v.price > 0 ?
+     v.price : dto.price`).
+  6. `specsError` (`useMemo` phụ thuộc `formData.specsText`) — viền đỏ +
+     dòng `⚠ JSON không hợp lệ: {message}` dưới textarea ngay khi gõ.
+     `handleSubmit` GIỮ NGUYÊN khối `try/catch JSON.parse` cũ làm lớp chặn
+     cuối, không xóa.
+- **Sự cố kỹ thuật trong lúc code (không liên quan logic nghiệp vụ)**: viết
+  đoạn có chứa `\u0300-\u036f` (regex bỏ dấu tiếng Việt, cần trích từ code
+  cũ) trực tiếp qua Edit tool bị chính tầng xử lý chuỗi của tool "ăn mất"
+  escape — biến `\u0300` thành ký tự combining diacritic thật thay vì giữ
+  nguyên 2 ký tự `\` + `u0300` trong source code, làm hỏng regex 2 lần liên
+  tiếp (kể cả `sed -i` qua Bash cũng dính lỗi tương tự). Khắc phục bằng
+  cách ghi file qua **Node.js script** (`String.fromCharCode(92)` dựng thủ
+  công ký tự backslash), né hoàn toàn tầng escape của Edit tool/shell. Bài
+  học cho phiên sau: **bất kỳ đoạn code nào chứa chuỗi `\uXXXX`, `\n`,
+  `\s`... cần giữ nguyên literal (không phải xuống dòng/khoảng trắng thật)
+  PHẢI ghi qua Node script**, không dùng Edit tool trực tiếp.
+- **Đã test**: `npx tsc --noEmit` sạch (chạy nhiều lần trong lúc code, sau
+  mỗi bước). Người dùng tự bấm qua UI thật (không có `claude-in-chrome`
+  trong phiên này), kết quả tổng hợp:
+  - **6/8 mục PASS ngay lần đầu** (mini-modal quick-add cả 2 loại, confirm
+    đóng modal, khóa nút Submit, SKU readOnly + sinh lại, tooltip/JSON
+    inline).
+  - **1 bug thật phát hiện qua test (mục 5 — ảnh biến thể)**: thêm 2 ảnh
+    liên tiếp cho CÙNG 1 variant, Cloudinary lưu đủ 2 (xác nhận qua tên
+    folder) nhưng UI chỉ hiện lại 1 ảnh. Nguyên nhân xác nhận qua đọc code:
+    `handleVariantImageUpload`/`handleRemoveVariantImage` tính
+    `updatedVariants` từ `formData.variants` đọc ở closure ngoài thay vì
+    `prev.variants` trong functional updater của `setFormData` — nếu 2 lượt
+    upload cùng variant chồng lấn thời gian, lượt sau đọc lại mảng CŨ (chưa
+    có ảnh 1) rồi set đè. Đã sửa cả 2 hàm chuyển hẳn sang tính trên `prev`
+    (React đảm bảo functional updater áp dụng tuần tự trên state mới nhất,
+    không mất update dù có race). Test lại: PASS.
+  - **1 wording gây hiểu nhầm (mục 7)**: tooltip/placeholder "giá sản phẩm
+    gốc" trùng tên với field "Giá gốc/Original Price" riêng biệt trên form,
+    trong khi hành vi thật là fallback về "Giá bán" (`price`). Đổi thành
+    "Để trống hoặc 0 sẽ dùng đúng Giá bán của sản phẩm chính" /
+    placeholder "0 = dùng Giá bán chính". Test lại: PASS.
+  - **1 nghi vấn bug ĐIỀU TRA KỸ, KẾT LUẬN KHÔNG PHẢI BUG**: người dùng báo
+    folder Cloudinary ảnh variant thiếu Brand ("general" thay vì "anker")
+    trong khi thumbnail đúng. Viết script Node mô phỏng đúng thuật toán
+    `getDynamicFolder` cho cả 5 tổ hợp thiếu/đủ Category+SubCategory+Brand
+    — xác nhận toán học: không có nhánh logic riêng cho `type='variant'`,
+    cùng 1 biểu thức tra cat/subCat/brand dùng chung cho cả 3 loại ảnh, thư
+    mục cha LUÔN nhất quán nếu đọc `formData` tại cùng 1 thời điểm. Người
+    dùng tự test lại có kiểm soát thứ tự (chọn đủ 3 dropdown TRƯỚC khi
+    upload) → khớp hoàn toàn. Kết luận: nguyên nhân là **thứ tự thao tác**
+    (upload ảnh trước khi hoàn tất dropdown, đổi dropdown sau không cập
+    nhật lại folder ảnh cũ), không phải bug code — đã ghi vào Known Issues
+    (mở rộng từ ghi chú cũ chỉ nhắc SubCategory sang cả Category/Brand).
+- **Lưu ý/vấn đề gặp phải**: Đã dọn sạch mọi dữ liệu/file test tạm trong
+  quá trình điều tra (không tạo bản ghi DB nào cần dọn — toàn bộ test dùng
+  script Node mô phỏng thuần túy, không gọi API thật). CLAUDE.md mục 2b và
+  mục "Cảnh báo tồn kho thấp" (đã xong từ việc trước nhưng CLAUDE.md quên
+  cập nhật) đều đã sửa lại khớp thực tế, đúng nguyên tắc #10.

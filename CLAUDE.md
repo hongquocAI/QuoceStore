@@ -334,38 +334,30 @@ sau khi đã thêm `minPrice`/`maxPrice` vào `QueryProductDto`.
 - ✅ ĐÃ XONG — Trang quản lý đơn hàng Admin (`/admin/orders`). Xem mô tả chi
   tiết ở mục "ĐÃ HOÀN THÀNH → Nhóm F (phần 2)" phía trên.
 
-### 2b. Cải thiện UX form Thêm/Sửa sản phẩm Admin (tách riêng khỏi Nhóm F —
-### đây là UX Frontend thuần túy, không phải logic nghiệp vụ backend)
+### 2b. ✅ ĐÃ XONG — Cải thiện UX form Thêm/Sửa sản phẩm Admin (2026-08-30)
 
-Đã review kỹ `admin/products/page.tsx` (2026-08-29) — hoạt động đúng chức
-năng, không có bug, nhưng chưa thân thiện với thao tác hàng ngày của Admin.
-Làm SAU khi xong "Trang quản lý đơn hàng Admin" ở trên. Chỉ ghi nhận vào
-hàng đợi lúc này, CHƯA code.
+Làm đủ cả 6 việc ưu tiên cao/trung bình đã liệt kê trước đó (mini-modal
+quick-add thay `window.prompt()`, xác nhận đóng modal chưa lưu, khóa nút
+Submit, SKU readOnly + nút sinh lại, ghi chú fallback giá biến thể, validate
+JSON specs inline). Việc 7 (chia tab/section) CHỦ ĐỘNG chưa làm — để sau khi
+catalog lớn, đúng quyết định ban đầu. Chi tiết kỹ thuật đầy đủ xem
+PROGRESS.md phần "Nhật ký chi tiết" (entry `[2026-08-30]`).
 
-**Ưu tiên cao (nên làm hết):**
-1. Thay `window.prompt()` ở `handleQuickAddSubCategory`/`handleQuickAddBrand`
-   bằng modal riêng có form đàng hoàng (không dùng hộp thoại thô của trình
-   duyệt) — cho phép nhập cả `logoUrl` khi tạo Brand.
-2. Thêm xác nhận trước khi đóng modal nếu form đã có dữ liệu chưa lưu
-   (`window.confirm` hoặc kiểm tra `formData` đã đổi so với lúc mở) — tránh
-   Admin lỡ tay mất dữ liệu đã gõ.
-3. Khóa nút Submit + hiện trạng thái "ĐANG XỬ LÝ..." trong lúc `handleSubmit`
-   đang chạy (giống pattern `uploadingThumbnail` đã có), tránh double-submit.
+Qua test tay phát hiện thêm 2 bug thật, đã sửa cùng đợt: (1) mất ảnh variant
+khi upload 2 ảnh nhanh liên tiếp cho cùng 1 màu (stale closure trong
+`handleVariantImageUpload`/`handleRemoveVariantImage`, đã sửa dùng
+`prev.variants`); (2) wording tooltip giá biến thể nhầm "giá gốc" (trùng tên
+field Original Price) trong khi hành vi thật fallback về "Giá bán".
 
-**Ưu tiên trung bình (làm nếu tiện):**
-4. Ô "Mã SKU tự động" — làm rõ hành vi: hoặc `readOnly` hẳn kèm nút "Sinh lại
-   mã khác", hoặc bỏ chữ "tự động" nếu cố tình cho sửa tay.
-5. Thêm ghi chú nhỏ cạnh field giá biến thể: "Để trống hoặc 0 sẽ dùng giá sản
-   phẩm gốc" — giải thích rõ hành vi fallback đã có ở backend.
-6. Validate JSON của `specsText` ngay khi gõ (không đợi tới lúc Submit) —
-   hiện lỗi inline dưới textarea.
+✅ **Cảnh báo tồn kho thấp** (threshold `< 5`, badge ở bảng Admin Products)
+— ĐÃ XONG 2026-08-30, xem PROGRESS.md.
 
-**Không cần làm ngay (để sau khi catalog thật sự lớn):**
-7. Chia form dài thành nhiều tab/section (Thông tin cơ bản / Giá & Kho /
-   Hình ảnh / Biến thể).
-
-- Cảnh báo tồn kho thấp: threshold trên Product/ProductVariant, hiển thị badge
-  cảnh báo ở Admin khi stock < 5 (tùy chỉnh)
+**Hàng đợi mới phát sinh từ đợt này (chưa code):**
+- Ô "Thông số kỹ thuật (Specs - JSON Format)" nên thay bằng trình xây dựng
+  key-value động (hàng Tên thuộc tính/Giá trị + nút Thêm, tự ghép JSON) —
+  JSON thô là rào cản UX thật với Admin không biết lập trình. Phạm vi lớn
+  hơn 1 lần sửa nhỏ, cần thiết kế riêng.
+- Cloudinary orphaned files — xem mục Nhóm E bên dưới.
 
 ### 3. Nhóm D — Pháp lý & Tuân thủ (BẮT BUỘC trước khi public thật)
 - Trang /privacy-policy: Chính sách bảo mật — BẮT BUỘC theo luật vì hệ thống
@@ -386,6 +378,14 @@ hàng đợi lúc này, CHƯA code.
 - Xác nhận chiến lược backup của Neon Postgres (retention policy)
 - CI/CD cơ bản: ít nhất chạy `tsc --noEmit` + test trước khi deploy (có thể
   dùng GitHub Actions vì repo đã có sẵn trên GitHub)
+- **Cloudinary garbage collection** (phát hiện 2026-08-30): ảnh
+  (thumbnail/gallery/variant) upload lên Cloudinary NGAY khi Admin chọn
+  file, trước cả khi bấm Lưu sản phẩm — nếu Admin xóa ảnh khỏi form (đã lưu
+  hay chưa lưu sản phẩm), file vẫn còn trên Cloudinary, không tự dọn. Trước
+  go-live: viết script quét toàn bộ `quoce-store/products/...`, đối chiếu
+  URL đang thực sự được `Product.thumbnail`/`images`/`ProductVariant.images`
+  tham chiếu trong DB, xóa file không khớp. Chưa cần làm ngay (catalog nhỏ,
+  free tier đủ dung lượng).
 
 ## GIAO THỨC LÀM VIỆC BẠN PHẢI TUÂN THỦ
 
