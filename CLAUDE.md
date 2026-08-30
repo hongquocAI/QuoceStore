@@ -359,6 +359,62 @@ field Original Price) trong khi hành vi thật fallback về "Giá bán".
   hơn 1 lần sửa nhỏ, cần thiết kế riêng.
 - Cloudinary orphaned files — xem mục Nhóm E bên dưới.
 
+### 2c. Nhóm G (MỚI, 2026-08-31) — Hoàn thiện Frontend (Polish cho Portfolio)
+
+**CHỈ GHI NHẬN LÚC NÀY, CHƯA CODE.** Cần Plan Mode kỹ + audit trước khi thực
+thi bất kỳ thay đổi nào — đây là quyết định thẩm mỹ, không phải bug logic.
+
+**Bối cảnh — đổi thứ tự ưu tiên toàn dự án:** Người dùng đã xác nhận
+(2026-08-31) mục tiêu chính hiện tại là tạo 1 project HOÀN CHỈNH, ĐẸP để
+đưa lên GitHub làm **portfolio** — không phải mở cửa hàng kinh doanh thật
+ngay (khác giả định ban đầu khi CLAUDE.md này được viết). Vì vậy **Nhóm G
+làm TRƯỚC Nhóm D (pháp lý) và Nhóm E (deploy production thật)** — vì giao
+diện là thứ người xem GitHub/demo chạm vào đầu tiên, còn pháp lý/deploy
+thật chỉ cần thiết khi thật sự kinh doanh.
+
+**Định hướng thiết kế đã CHỐT — KHÔNG ép toàn bộ site về 1 style duy nhất.**
+Giữ nguyên 2 "gia đình" style đã hình thành tự nhiên và hợp lý:
+- **Storefront/Marketing** (Home, Accessories, Product listing, Login): tối
+  giản, đen-trắng tương phản mạnh, chữ đậm in hoa, viền vuông sắc nét
+  (`border-2`, `rounded-none`).
+- **Account/Giao dịch** (Cart, Checkout, Profile, Orders): nền `#fafafc`
+  dịu, thẻ bo góc mềm (`rounded-2xl`/`rounded-3xl`), tông màu ấm hơn.
+
+**G1 — AUDIT TOÀN DIỆN (BẮT BUỘC làm ĐẦU TIÊN ở phiên tiếp theo, không nhảy
+thẳng vào sửa dù đã biết rõ vấn đề ở G2):**
+- Liệt kê MỌI trang/component hiện có trong `frontend/src/app` và
+  `frontend/src/components`.
+- Với mỗi trang, ghi rõ: đang thuộc "gia đình" nào (Storefront/Account/
+  khác), có nhất quán với các trang CÙNG gia đình không, có điểm nào lệch
+  tông/thiếu tinh tế so với chuẩn thương mại điện tử thật (Shopee/Tiki/
+  TikTok Shop — chỉ tham khảo mức độ hoàn thiện, không cần copy y hệt)
+  không.
+- Liệt kê rõ trang/tính năng nào ĐANG THIẾU hẳn hoặc chưa đủ đầy đủ (người
+  dùng nhận định "cart, chi tiết sản phẩm... chưa đủ tính năng" — cần audit
+  cụ thể: thiếu gì đúng nghĩa, hay chỉ thiếu polish).
+- Trình bày kết quả audit dưới dạng bảng cho người dùng xem trước khi quyết
+  định thứ tự sửa.
+
+**G2 — 2 ô nhập liệu thô trong form Thêm/Sửa sản phẩm Admin
+(`admin/products/page.tsx`) — ĐÃ XÁC ĐỊNH RÕ, ưu tiên cao trong Nhóm G:**
+- "Thông số kỹ thuật (Specs - JSON Format)": hiện là textarea JSON thô, bắt
+  Admin (không biết lập trình) tự gõ đúng cú pháp `{}"":,` — rất không
+  thân thiện. Thay bằng trình xây dựng key-value động: danh sách hàng [Tên
+  thuộc tính] [Giá trị] [nút Xóa] + nút "+ Thêm thuộc tính" ở cuối. Hệ
+  thống tự ghép thành đúng JSON lúc submit, Admin không bao giờ thấy/chạm
+  cú pháp JSON. Vẫn giữ tính linh hoạt (mỗi loại sản phẩm thuộc tính khác
+  nhau, không có schema cố định).
+- "Điểm nhấn sản phẩm (Highlights - Mỗi dòng 1 ý)": hiện là textarea nhiều
+  dòng, mỗi dòng = 1 highlight. Đỡ thô hơn Specs (không cần biết cú pháp
+  gì), nhưng nên cân nhắc nâng cấp đồng bộ thành dynamic list input (mỗi
+  highlight 1 ô input riêng + nút thêm/xóa từng dòng, cùng pattern với
+  Specs) — để nhất quán trải nghiệm giữa 2 trường "nhập nhiều mục" trong
+  cùng 1 form, thay vì 1 cái textarea thô 1 cái list UI đẹp.
+
+**G3 — Sau khi G1 (audit) hoàn tất**, bàn với người dùng để chốt danh sách
+ưu tiên sửa cụ thể cho từng trang/component — KHÔNG tự ý sửa hàng loạt khi
+chưa có danh sách đã duyệt.
+
 ### 3. Nhóm D — Pháp lý & Tuân thủ (BẮT BUỘC trước khi public thật)
 - Trang /privacy-policy: Chính sách bảo mật — BẮT BUỘC theo luật vì hệ thống
   thu thập CCCD (Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân VN)
