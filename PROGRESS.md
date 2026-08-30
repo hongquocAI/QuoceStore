@@ -38,15 +38,14 @@ Việc tiếp theo trong Nhóm F: bảng AuditLog, cảnh báo tồn kho thấp 
 mục "VIỆC CẦN LÀM TIẾP — mục 2"). Ngoài ra còn hàng đợi riêng "Cải thiện UX
 form Thêm/Sửa sản phẩm Admin" (mục 2b trong CLAUDE.md) — làm sau.
 
-**✅ Bug UX kèm theo đã sửa (2026-08-29)**: `cart/page.tsx` hiển thị message
-lỗi CỨNG cho mọi lỗi áp mã, bỏ qua message thật rõ ràng từ backend. Người
-dùng phát hiện qua `curl` trực tiếp. Đã sửa đọc `err.response?.data?.message`.
-Chưa tự bấm qua UI được (không có trình duyệt) — cần người dùng xác nhận lại.
+**✅ Bug UX message lỗi áp mã giảm giá — ĐÃ ĐÓNG HOÀN TOÀN 2026-08-29.**
+Người dùng test UI thật PASS cả 2 ca: mã `QUOCE10` (hết lượt) và `ABCXYZ`
+(không tồn tại) hiện đúng 2 message khác nhau, đúng theo từng lý do trả về
+từ backend.
 
-⏳ **CÒN CHỜ NGƯỜI DÙNG KIỂM TRA TAY luồng checkout có mã giảm giá** — xem
-mục "🔍 Cần người dùng kiểm tra" bên dưới. Backend đã verify đầy đủ bằng
-PowerShell, nhưng phần UI (áp mã ở giỏ hàng → sang checkout → đặt hàng) chưa
-tự bấm qua được.
+**✅ Luồng checkout có mã giảm giá — ĐÃ ĐÓNG HOÀN TOÀN 2026-08-29.** Người
+dùng test UI thật PASS: cart → checkout → đặt hàng, mã giảm giá được giữ
+xuyên suốt, `totalAmount` cuối cùng đúng đã trừ giảm giá.
 
 **✅ Nhóm B ĐÃ HOÀN TẤT** (backend verify bằng request thật, frontend pass
 `tsc --noEmit`, người dùng đã test tay trang Admin).
@@ -119,45 +118,9 @@ PAID hiện cảnh báo PayOS" chưa có đơn PENDING/PROCESSING+PAID nào đ�
 UI, nhưng backend đã verify kỹ phần này bằng JWT tự ký trong phiên trước —
 người dùng chấp nhận mức độ verify này là đủ, không cần thêm.
 
-**ƯU TIÊN 1 — bug UX message lỗi mã giảm giá (2026-08-29, mới sửa):**
-*(Tầng BACKEND đã được người dùng tự xác nhận đúng qua `curl` TRƯỚC khi yêu
-cầu sửa — `GET /discounts/code/:code` luôn trả đúng 3 message phân biệt rõ
-ràng theo từng lý do, đây là code gốc có sẵn từ commit đầu tiên của dự án,
-không phải do phiên này viết. Phần DUY NHẤT chưa từng được test là hiển thị
-thật trên UI trang giỏ hàng — vì bug nằm ở tầng Frontend, độc lập với
-backend. Đã xác nhận bằng `git log --follow` trên `cart/page.tsx`: khối
-`catch` chứa message cứng tồn tại từ commit đầu tiên, KHÔNG có commit nào
-trước đó từng sửa nó — đây là lần sửa đầu tiên, không phải làm lại việc cũ.)*
-1. ✅ Mã `QUOCE10` GIỜ ĐÃ THẬT SỰ HẾT LƯỢT (`usedCount = maxUsage = 10/10`,
-   xác nhận 2026-08-29 lúc verify script seed demo sản phẩm — không cần tự
-   tạo thêm đơn để làm hết lượt nữa, cứ dùng thẳng mã này để test).
-2. Ở `/cart`, nhập `QUOCE10` → bấm "Áp dụng" → PHẢI hiện đúng **"Mã giảm giá
-   đã hết lượt sử dụng"**, KHÔNG phải câu chung chung "Mã giảm giá không tồn
-   tại hoặc có lỗi kết nối" như trước khi sửa.
-3. Test thêm 1 ca khác để chắc chắn message thay đổi theo đúng lý do (không
-   phải luôn hiện đúng 1 câu trùng hợp): nhập mã không tồn tại (VD `ABCXYZ`)
-   → phải hiện **"Mã giảm giá không tồn tại hoặc đã khóa"** — khác câu ở bước 2.
-
-**ƯU TIÊN 2 — luồng checkout có mã giảm giá (Nhóm F, 2026-08-29):**
-⚠️ **CẬP NHẬT 2026-08-29 (lúc verify script demo sản phẩm)**: `QUOCE10` giờ
-đã THẬT SỰ HẾT LƯỢT (`usedCount = maxUsage = 10/10`) — bước 1 dưới đây áp mã
-này sẽ báo "Mã giảm giá đã hết lượt sử dụng" thay vì áp thành công. Đây
-KHÔNG phải bug (đúng hành vi mong đợi, xem ƯU TIÊN 1). Muốn test lại luồng
-checkout THÀNH CÔNG với mã, người dùng cần: (a) tăng `maxUsage` của
-`QUOCE10` qua Prisma Studio, hoặc (b) tự tạo 1 discount code mới. Không tự ý
-sửa `usedCount`/`maxUsage` của mã này trong lúc thêm dữ liệu demo vì đó là
-dữ liệu thật phản ánh lịch sử dùng thật, ngoài phạm vi yêu cầu.
-1. Vào `/cart`, thêm 1-2 sản phẩm, nhập mã `QUOCE10` → bấm "Áp dụng" → thấy
-   dòng "Giảm giá" + "Tổng cộng" đúng 10%.
-2. Bấm "Tiến hành thanh toán" → sang `/checkout` → PHẢI thấy lại đúng dòng
-   "Giảm giá (QUOCE10)" + "Tổng cộng" ở khối tóm tắt (đây chính là chỗ trước
-   đây bị RƠI MẤT — mã không hề tới được trang checkout).
-3. Điền form, đặt hàng (COD) → màn hình "Đặt hàng thành công" phải hiện đúng
-   dòng "Giảm giá (QUOCE10)" và "Tổng tiền" đã trừ đúng 10%.
-4. Vào `/orders` (lịch sử đơn) xác nhận đơn vừa tạo có `totalAmount` đúng
-   (đã trừ giảm giá).
-5. (Tùy chọn) Test ca lỗi: sửa tay 1 mã sai trong ô nhập ở giỏ hàng → phải
-   báo "không hợp lệ", không chặn được thanh toán với giá gốc nếu bỏ qua mã.
+*(ƯU TIÊN 1 và ƯU TIÊN 2 — cả 2 mục về Discount đã ĐÓNG HOÀN TOÀN 2026-08-29,
+người dùng test UI thật PASS. Xem "🎯 TRẠNG THÁI HIỆN TẠI" phía trên và entry
+tương ứng trong Nhật ký chi tiết.)*
 
 **Các mục còn lại (từ Nhóm B):**
 Backend đã được verify đầy đủ bằng request thật (xem nhật ký chi tiết). Phần
@@ -656,3 +619,15 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
     an toàn (idempotent) nếu cần thêm dữ liệu demo sau này. TRƯỚC khi
     go-live thật (Nhóm E), phải dọn sạch 18 sản phẩm demo bằng
     `prisma.product.deleteMany({ where: { title: { startsWith: '[DEMO] ' } } })`.
+
+### [2026-08-29] Đã đóng: Bug UX message lỗi discount + luồng checkout có mã giảm giá
+
+- **File liên quan**: `frontend/src/app/cart/page.tsx` (sửa ở entry trước —
+  đọc `err.response?.data?.message` thay vì chuỗi cứng), `frontend/src/app/checkout/page.tsx`.
+- **Đã test**: Người dùng tự bấm qua UI thật, xác nhận PASS cả 2 mục còn nợ:
+  1. Message lỗi mã giảm giá: `QUOCE10` (hết lượt) và `ABCXYZ` (không tồn
+     tại) hiện đúng 2 message khác nhau theo đúng lý do trả về từ backend.
+  2. Luồng checkout có mã giảm giá: cart → checkout → đặt hàng, mã giữ
+     xuyên suốt, `totalAmount` cuối đúng đã trừ giảm giá.
+- **Lưu ý/vấn đề gặp phải**: Không có. Cả 2 mục đóng dứt điểm, không còn nợ
+  gì ở phần Discount/Nhóm F (phần 1).

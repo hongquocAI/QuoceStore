@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, GoogleLoginDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { getRequestMeta } from '../common/utils/request-meta';
 
 const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000; // 15 phút — khớp với JwtModule expiresIn
 const REFRESH_TOKEN_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 ngày
@@ -15,13 +16,6 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly config: ConfigService,
   ) {}
-
-  private getRequestMeta(req: any) {
-    return {
-      ip: req.ip || req.headers['x-forwarded-for'] || undefined,
-      userAgent: req.headers['user-agent'] || undefined,
-    };
-  }
 
   // 🛡️ FIX QUAN TRỌNG NHẤT của Nhóm A: token giờ được gửi qua cookie
   // HttpOnly, KHÔNG còn trả trong JSON body nữa. JavaScript ở Frontend
@@ -59,7 +53,7 @@ export class AuthController {
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('register')
   async register(@Body() dto: RegisterDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.register(dto, this.getRequestMeta(req));
+    const result = await this.authService.register(dto, getRequestMeta(req));
     this.setAuthCookies(res, result.data);
     const { accessToken, refreshToken, ...userData } = result.data;
     return { ...result, data: userData };
@@ -68,7 +62,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.login(dto, this.getRequestMeta(req));
+    const result = await this.authService.login(dto, getRequestMeta(req));
     this.setAuthCookies(res, result.data);
     const { accessToken, refreshToken, ...userData } = result.data;
     return { ...result, data: userData };
@@ -77,7 +71,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('google')
   async googleLogin(@Body() dto: GoogleLoginDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.googleLogin(dto, this.getRequestMeta(req));
+    const result = await this.authService.googleLogin(dto, getRequestMeta(req));
     this.setAuthCookies(res, result.data);
     const { accessToken, refreshToken, ...userData } = result.data;
     return { ...result, data: userData };
@@ -93,7 +87,7 @@ export class AuthController {
     if (!refreshToken) {
       throw new UnauthorizedException('Không tìm thấy phiên đăng nhập, vui lòng đăng nhập lại.');
     }
-    const result = await this.authService.refreshTokens({ refreshToken }, this.getRequestMeta(req));
+    const result = await this.authService.refreshTokens({ refreshToken }, getRequestMeta(req));
     this.setAuthCookies(res, result.data);
     return { success: true, message: 'Làm mới phiên đăng nhập thành công' };
   }

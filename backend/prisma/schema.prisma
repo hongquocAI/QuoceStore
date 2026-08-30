@@ -257,15 +257,19 @@ model Discount {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?
-  action    String
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([createdAt])
   @@map("audit_logs")
 }

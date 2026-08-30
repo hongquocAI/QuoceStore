@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { Audit } from '../common/decorators/audit.decorator';
 
 @Controller('products')
 export class ProductController {
@@ -66,6 +67,7 @@ export class ProductController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('CREATE_PRODUCT', 'Product')
   async create(@Body() dto: CreateProductDto) {
     return await this.productService.create(dto);
   }
@@ -76,6 +78,7 @@ export class ProductController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('UPDATE_PRODUCT', 'Product')
   async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return await this.productService.update(id, dto);
   }
@@ -83,6 +86,7 @@ export class ProductController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('DELETE_PRODUCT', 'Product')
   async remove(@Param('id') id: string) {
     return await this.productService.remove(id);
   }

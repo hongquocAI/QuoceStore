@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { Audit } from '../common/decorators/audit.decorator';
 
 @Controller('sub-categories')
 export class SubCategoriesController {
@@ -19,6 +20,7 @@ export class SubCategoriesController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('CREATE_SUB_CATEGORY', 'SubCategory')
   async create(@Body() dto: CreateSubCategoryDto) {
     return this.subCategoriesService.create(dto);
   }
@@ -26,6 +28,7 @@ export class SubCategoriesController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('DELETE_SUB_CATEGORY', 'SubCategory')
   async remove(@Param('id') id: string) {
     return this.subCategoriesService.remove(id);
   }

@@ -9,6 +9,7 @@ import { Throttle } from '@nestjs/throttler';
 import { LookupOrderDto } from './dto/lookup-order.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
 import { UpdateShippingStatusDto } from './dto/update-shipping-status.dto';
+import { Audit } from '../common/decorators/audit.decorator';
 
 @Controller('orders')
 export class OrdersController {
@@ -69,6 +70,7 @@ export class OrdersController {
   @Patch(':id/shipping-status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('UPDATE_ORDER_SHIPPING_STATUS', 'Order')
   async updateShippingStatus(@Param('id') id: string, @Body() dto: UpdateShippingStatusDto) {
     return this.ordersService.updateShippingStatus(id, dto);
   }

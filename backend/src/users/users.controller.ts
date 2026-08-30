@@ -14,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { UpdateProfileDto, ChangePasswordDto } from './dto/user-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Audit } from '../common/decorators/audit.decorator';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard) // 🛡️ FIX QUAN TRỌNG NHẤT: TOÀN BỘ route trong controller này
@@ -48,6 +49,7 @@ export class UsersController {
   }
 
   @Patch(':id/password')
+  @Audit('CHANGE_PASSWORD', 'User')
   async changePassword(@Param('id') id: string, @Body() dto: ChangePasswordDto, @Req() req: any) {
     this.assertOwnerOrAdmin(req, id);
     return this.usersService.changePassword(id, dto);

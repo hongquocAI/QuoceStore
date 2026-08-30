@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { Audit } from '../common/decorators/audit.decorator';
 
 // ⚡ Chỉ cho phép folder nằm trong đúng cấu trúc phân tầng Enterprise đã
 // thiết kế: quoce-store/products/... hoặc quoce-store/users/...
@@ -23,6 +24,7 @@ export class CloudinaryController {
   constructor(private readonly cloudinaryService: CloudinaryService) {}
 
   @Post()
+  @Audit('UPLOAD_IMAGE')
   // 🛡️ MỚI (Phase 2): tối đa 20 upload/phút/IP — dù đã có Auth Guard,
   // vẫn nên chặn kịch bản lỗi (script Admin chạy vòng lặp vô hạn, hoặc
   // token Admin bị lộ bị lợi dụng spam upload tốn storage Cloudinary).

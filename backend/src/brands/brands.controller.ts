@@ -5,7 +5,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
- 
+import { Audit } from '../common/decorators/audit.decorator';
+
 @Controller('brands')
 export class BrandsController {
   constructor(private readonly brandsService: BrandsService) {}
@@ -21,13 +22,15 @@ export class BrandsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('CREATE_BRAND', 'Brand')
   async create(@Body() dto: CreateBrandDto) {
     return this.brandsService.create(dto);
   }
- 
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @Audit('DELETE_BRAND', 'Brand')
   async remove(@Param('id') id: string) {
     return this.brandsService.remove(id);
   }
