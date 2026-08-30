@@ -69,6 +69,18 @@ const STANDARD_COLORS = [
   { code: 'gold', name: 'Vàng đồng', hex: '#D97706' },
 ];
 
+// ⚡ Cảnh báo tồn kho thấp (Nhóm F) — ngưỡng cố định, chỉ dùng để HIỂN THỊ ở
+// bảng Admin, không đổi schema/API. Không dùng Product.stock cho sản phẩm CÓ
+// variant vì đó không phải kho thật đang bán (OrdersService trừ kho ở
+// ProductVariant.stock khi khách chọn màu) — xem PROGRESS.md.
+const LOW_STOCK_THRESHOLD = 5;
+
+function getStockBadge(stock: number): { label: string; className: string } | null {
+  if (stock === 0) return { label: 'Hết hàng', className: 'bg-red-100 text-red-800' };
+  if (stock < LOW_STOCK_THRESHOLD) return { label: `Sắp hết: ${stock}`, className: 'bg-amber-100 text-amber-800' };
+  return null;
+}
+
 export default function AdminProductsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -752,20 +764,58 @@ export default function AdminProductsPage() {
                     <td className="p-4">
                       <div className="flex gap-1 items-center">
                         {prod.variants && prod.variants.length > 0 ? (
-                          prod.variants.map((v, i) => (
-                            <span 
-                              key={i} 
-                              className="w-4 h-4 rounded-full border border-gray-300 block" 
-                              style={{ backgroundColor: v.hexCode || '#000' }}
-                              title={v.colorName}
-                            />
-                          ))
+                          prod.variants.map((v, i) => {
+                            const variantBadge = getStockBadge(v.stock);
+                            const ringClass = variantBadge
+                              ? v.stock === 0 ? 'ring-2 ring-red-500' : 'ring-2 ring-amber-500'
+                              : 'border border-gray-300';
+                            return (
+                              <span
+                                key={i}
+                                className={`w-4 h-4 rounded-full block ${ringClass}`}
+                                style={{ backgroundColor: v.hexCode || '#000' }}
+                                title={`${v.colorName} — còn ${v.stock}`}
+                              />
+                            );
+                          })
                         ) : (
                           <span className="text-gray-400 text-[10px]">Đơn lẻ</span>
                         )}
                       </div>
                     </td>
-                    <td className="p-4 font-bold">{prod.stock}</td>
+                    <td className="p-4 font-bold">
+                      {prod.variants && prod.variants.length > 0 ? (
+                        (() => {
+                          const totalVariantStock = prod.variants.reduce((sum, v) => sum + v.stock, 0);
+                          const outOfStockCount = prod.variants.filter(v => v.stock === 0).length;
+                          const lowStockCount = prod.variants.filter(v => v.stock > 0 && v.stock < LOW_STOCK_THRESHOLD).length;
+                          const summaryBadge = outOfStockCount > 0
+                            ? { label: `${outOfStockCount} màu hết hàng`, className: 'bg-red-100 text-red-800' }
+                            : lowStockCount > 0
+                            ? { label: `${lowStockCount} màu sắp hết`, className: 'bg-amber-100 text-amber-800' }
+                            : null;
+                          return (
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="text-[11px] text-gray-500 font-normal">Tổng biến thể: {totalVariantStock}</span>
+                              {summaryBadge && (
+                                <span className={`px-2 py-1 text-[10px] font-black uppercase tracking-wider ${summaryBadge.className}`}>
+                                  {summaryBadge.label}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="flex flex-col gap-1 items-start">
+                          <span>{prod.stock}</span>
+                          {getStockBadge(prod.stock) && (
+                            <span className={`px-2 py-1 text-[10px] font-black uppercase tracking-wider ${getStockBadge(prod.stock)!.className}`}>
+                              {getStockBadge(prod.stock)!.label}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-4">
                       <span className={`px-2 py-1 text-[10px] font-black uppercase tracking-wider ${
                         prod.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'

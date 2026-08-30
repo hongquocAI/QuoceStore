@@ -60,9 +60,36 @@ go-live** bằng:
 await prisma.product.deleteMany({ where: { title: { startsWith: '[DEMO] ' } } });
 ```
 
-Việc tiếp theo trong Nhóm F: cảnh báo tồn kho thấp (CLAUDE.md mục "VIỆC CẦN
-LÀM TIẾP — mục 2"). Ngoài ra còn hàng đợi riêng "Cải thiện UX form Thêm/Sửa
-sản phẩm Admin" (mục 2b trong CLAUDE.md) — làm sau.
+**✅ Nhóm F — Cảnh báo tồn kho thấp (Admin Products) ĐÃ ĐÓNG HOÀN TOÀN
+(2026-08-30).** Frontend thuần túy, chỉ sửa
+`frontend/src/app/admin/products/page.tsx` — không đổi schema/API/
+`QueryProductDto`. Ngưỡng cố định `LOW_STOCK_THRESHOLD = 5` (không phải cột
+DB, không có UI cấu hình — đã chốt tối giản với người dùng). Sản phẩm KHÔNG
+variant → xét `Product.stock`; sản phẩm CÓ variant → xét từng
+`ProductVariant.stock` (không dùng `Product.stock` vì không phản ánh kho
+thật khi có variant — `OrdersService` trừ kho ở variant khi khách chọn
+màu). Cột "Kho": hiện số + badge (`bg-red-100`="Hết hàng" khi stock=0,
+`bg-amber-100`="Sắp hết: N" khi 0<stock<5); sản phẩm có variant hiện "Tổng
+biến thể: N" + badge tổng hợp theo mức nghiêm trọng nhất (ưu tiên đỏ nếu có
+màu hết hàng). Cột "Biến thể màu": thêm viền `ring-2` (đỏ/vàng) quanh chấm
+màu bị thấp/hết, tooltip `title` giờ luôn kèm số tồn kho
+(`"<màu> — còn <N>"`). Màu badge tái dùng đúng bảng màu đã có sẵn trong dự
+án (không phát minh màu mới).
+Verify: `tsc --noEmit` sạch (cả lúc mới sửa và sau khi khôi phục dữ liệu
+test). Không có sẵn trình duyệt tự động trong phiên này (`claude-in-chrome`
+người dùng từ chối cài) — người dùng tự test UI thật bằng cách tạm hạ stock
+2 sản phẩm demo + 2 variant Baseus (giá trị gốc đã lưu trước khi sửa), xác
+nhận **4/4 mục PASS**: badge vàng/đỏ đúng cho sản phẩm không variant, viền
++ tooltip + badge tổng hợp đúng cho sản phẩm có variant, sản phẩm stock
+bình thường không có badge. 1 lần FAIL giả (tooltip tưởng thiếu số tồn kho)
+hóa ra do trình duyệt cache tooltip cũ — hard refresh xác nhận lại code
+đúng ngay từ đầu. Toàn bộ dữ liệu stock đã khôi phục đúng giá trị gốc, file
+script test tạm đã xóa sạch.
+
+Nhóm F giờ đã hoàn tất toàn bộ các mục trong CLAUDE.md "VIỆC CẦN LÀM TIẾP —
+mục 2" (Discount, trang quản lý đơn hàng Admin, AuditLog, cảnh báo tồn kho
+thấp). Còn lại: hàng đợi riêng "Cải thiện UX form Thêm/Sửa sản phẩm Admin"
+(mục 2b CLAUDE.md, chưa code) — và các Nhóm D/E chưa bắt đầu.
 
 **✅ Bug UX message lỗi áp mã giảm giá — ĐÃ ĐÓNG HOÀN TOÀN 2026-08-29.**
 Người dùng test UI thật PASS cả 2 ca: mã `QUOCE10` (hết lượt) và `ABCXYZ`
@@ -737,3 +764,47 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
     commit). Phiên sau đã xác nhận lại: đọc nguyên văn 3 file mới + diff
     toàn bộ file đã sửa trong commit, khớp 100% với plan đã duyệt — commit
     hợp lệ, không phải bất thường.
+
+### [2026-08-30] Đã hoàn thành: Cảnh báo tồn kho thấp — Admin Products (Nhóm F)
+
+- **File đã sửa**: `frontend/src/app/admin/products/page.tsx` — CHỈ file
+  này, không đụng backend/schema/API.
+  - Thêm `LOW_STOCK_THRESHOLD = 5` (hằng số cố định, không phải cột DB)
+    và helper `getStockBadge(stock)` trả `{ label, className }` hoặc `null`.
+  - Cột "Kho": sản phẩm không variant → số + badge nếu thấp/hết; sản phẩm
+    có variant → "Tổng biến thể: N" (tổng `variants.reduce`, KHÔNG dùng
+    `Product.stock` vì không phản ánh kho thật khi có variant) + badge tổng
+    hợp theo variant nghiêm trọng nhất (ưu tiên đỏ "N màu hết hàng" trước
+    vàng "N màu sắp hết").
+  - Cột "Biến thể màu": thêm `ring-2 ring-red-500`/`ring-2 ring-amber-500`
+    quanh chấm màu bị thấp/hết (giữ `border border-gray-300` cho bình
+    thường); `title` đổi từ chỉ tên màu sang `"<colorName> — còn <stock>"`.
+  - `colSpan` các nhánh empty/loading giữ nguyên `10` — không thêm cột mới.
+- **Đã test**: `npx tsc --noEmit` sạch (frontend). Không có trình duyệt tự
+  động sẵn có trong phiên này (`claude-in-chrome` — người dùng từ chối cài,
+  đã ghi nhận không hỏi lại trong phiên). Verify bằng cách:
+  1. Query trực tiếp DB xác nhận không có sản phẩm/variant nào đang có
+     stock thấp sẵn (thấp nhất là 12) → cần tạm hạ dữ liệu mới thấy được
+     badge.
+  2. Viết script Node tạm hạ stock 2 sản phẩm demo (`[DEMO] Webcam 4K...`
+     → 3, `[DEMO] Loa Soundbar...` → 0) và 2 variant của
+     `Pin sạc dự phòng Baseus Enerfill FC5` (Đen nhám → 2, Trắng sứ → 0),
+     lưu giá trị gốc ra file JSON trước khi đổi.
+  3. Người dùng tự bấm qua UI thật tại `/admin/products`, xác nhận
+     **4/4 mục PASS**: badge vàng "Sắp hết: 3", badge đỏ "Hết hàng", viền
+     ring đúng màu trên 2 chấm variant + badge tổng hợp đỏ "1 màu hết
+     hàng" + "Tổng biến thể: 2", các sản phẩm stock bình thường không có
+     badge nào.
+  4. Có 1 lần FAIL giả ở bước tooltip (người dùng tưởng thiếu số tồn kho
+     khi hover) — đọc lại code xác nhận đúng ngay từ đầu, hard refresh lại
+     trình duyệt thì hiện đúng đầy đủ `"<màu> — còn <N>"` → xác nhận đây là
+     trình duyệt cache tooltip cũ từ lần hover trước khi sửa code, không
+     phải bug thật.
+  5. Khôi phục đúng giá trị stock gốc cho cả 4 bản ghi (đã đối chiếu lại
+     qua Prisma sau khi restore, khớp 100% với giá trị đã lưu ban đầu),
+     xóa sạch toàn bộ file script test tạm.
+- **Lưu ý/vấn đề gặp phải**: Không có vấn đề thật nào trong code — điểm
+  "FAIL" duy nhất trong quá trình test hóa ra là do cache tooltip của trình
+  duyệt, không phải lỗi code. Đây là bài học nhỏ: khi test UI qua người
+  dùng bằng tooltip/hover, nên nhắc hard refresh trước nếu vừa sửa code
+  ngay trước đó, tránh nhầm lẫn cache trình duyệt với bug thật.
