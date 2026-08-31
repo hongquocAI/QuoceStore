@@ -115,7 +115,7 @@ npm run dev              # http://localhost:3000
 | `PAYOS_CLIENT_ID` / `_API_KEY` / `_CHECKSUM_KEY` | ✅ | PayOS |
 | `REDIS_URL` | ✅ | Connection string Redis, dạng `rediss://...` |
 | `NODE_ENV` | tùy chọn | `development` \| `production` |
-| `GOOGLE_CLIENT_ID` | tùy chọn | Chỉ cần nếu bật Google Login |
+| `GOOGLE_CLIENT_ID` | tùy chọn | Bật Google Login — thiếu thì tính năng tự tắt graceful |
 | `GEMINI_API_KEY` | tùy chọn | Chỉ cần nếu dùng Trợ lý AI |
 | `SENTRY_DSN` | tùy chọn | Chỉ cần nếu bật Error Tracking |
 
@@ -124,6 +124,7 @@ npm run dev              # http://localhost:3000
 | Biến | Bắt buộc | Mô tả |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | ✅ | URL backend, VD `http://localhost:5000` |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | tùy chọn | Bật nút "Đăng nhập với Google" trên `/login` và `/register` — thiếu thì nút tự ẩn |
 
 ## Scripts
 

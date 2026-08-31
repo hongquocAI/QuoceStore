@@ -18,6 +18,13 @@ class EnvironmentConfig {
   get isProduction(): boolean {
     return process.env.NODE_ENV === 'production';
   }
+
+  // ⚡ Nhóm G Đợt 2 (Phần B): KHÔNG throw như apiUrl — nếu thiếu, nút Google
+  // Login tự ẩn graceful (xem login/register page.tsx) thay vì crash cả
+  // trang. Google Login là tính năng phụ trợ, không phải lõi hệ thống.
+  get googleClientId(): string | undefined {
+    return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  }
 }
 
 export const ENV = new EnvironmentConfig();

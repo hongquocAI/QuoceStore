@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Email không hợp lệ' })
@@ -20,14 +20,15 @@ export class LoginDto {
   password: string;
 }
 
+// 🛡️ FIX QUAN TRỌNG (Nhóm G Đợt 2, Phần B): trước đây `token` optional và
+// DTO còn nhận cả `email`/`fullName` — client có thể bỏ qua `token` hoàn
+// toàn và tự khai `email` bất kỳ, khiến AuthService.googleLogin() bỏ qua
+// verify chữ ký Google (nhánh `if (dto.token)`), tìm-hoặc-tạo tài khoản
+// theo email client tự gửi. Đây là lỗ hổng chiếm đoạt tài khoản. Giờ
+// `token` BẮT BUỘC, và `email`/`fullName` KHÔNG còn nhận từ client nữa —
+// 2 field đó CHỈ được lấy từ payload đã verify chữ ký (xem auth.service.ts).
 export class GoogleLoginDto {
-  @IsOptional()
-  token?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  fullName?: string;
+  @IsString()
+  @IsNotEmpty({ message: 'Thiếu token xác thực Google.' })
+  token: string;
 }

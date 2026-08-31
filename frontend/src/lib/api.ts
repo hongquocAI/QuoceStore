@@ -17,7 +17,7 @@ export const api = axios.create({
 // động rõ ràng của người dùng. VD: khách chưa đăng nhập ghé trang chủ,
 // AuthContext âm thầm gọi /auth/me để kiểm tra — 401 ở đây là BÌNH THƯỜNG
 // (chưa đăng nhập), không nên bị đá về trang login.
-const SILENT_401_URLS = ['/auth/me', '/auth/login', '/auth/register', '/auth/refresh'];
+const SILENT_401_URLS = ['/auth/me', '/auth/login', '/auth/register', '/auth/refresh', '/auth/google'];
 
 let isRefreshing = false;
 let pendingQueue: Array<() => void> = [];

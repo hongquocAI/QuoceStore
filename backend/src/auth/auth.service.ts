@@ -182,40 +182,45 @@ export class AuthService {
   }
 
   async googleLogin(dto: GoogleLoginDto, meta?: { ip?: string; userAgent?: string }) {
-    // ⚡ CHẶN SỚM: Google Login chưa được cấu hình (chưa dùng thật) —
-    // trả lỗi rõ ràng thay vì cố verify với client rỗng (sẽ lỗi khó hiểu)
-    // hoặc tệ hơn là verify mà không kiểm tra audience đúng cách.
+    // ⚡ CHẶN SỚM: Google Login chưa được cấu hình — trả lỗi rõ ràng thay vì
+    // cố verify với client rỗng. GOOGLE_CLIENT_ID vẫn optional ở Joi
+    // (app.module.ts) có chủ đích, để backend không crash toàn bộ nếu biến
+    // này thiếu ở môi trường nào đó — nhánh này là lớp bảo vệ graceful.
     if (!this.googleClient || !this.googleClientId) {
       throw new ServiceUnavailableException(
         'Đăng nhập bằng Google hiện chưa khả dụng. Vui lòng dùng email/mật khẩu.',
       );
     }
 
-    let email = dto.email;
-    let fullName = dto.fullName;
+    // 🛡️ FIX QUAN TRỌNG (Nhóm G Đợt 2): `token` giờ BẮT BUỘC ở DTO
+    // (@IsNotEmpty) — KHÔNG còn nhánh "bỏ qua verify nếu thiếu token" như
+    // trước đây. `email`/`fullName` CHỈ được lấy từ payload đã verify chữ
+    // ký, không bao giờ đọc từ `dto` (đã bị xóa khỏi DTO).
+    let email: string;
+    let fullName: string;
+    let avatarUrl: string | undefined;
 
-    if (dto.token) {
-      try {
-        const ticket = await this.googleClient.verifyIdToken({
-          idToken: dto.token,
-          audience: this.googleClientId, // 🛡️ bắt buộc để chặn giả mạo từ OAuth Client khác
-        });
-        const payload = ticket.getPayload();
-        if (!payload || !payload.email) {
-          throw new UnauthorizedException('Không thể xác thực token Google.');
-        }
-        if (!payload.email_verified) {
-          throw new UnauthorizedException('Email Google chưa được xác minh.');
-        }
-        email = payload.email;
-        fullName = payload.name || 'Người dùng Google';
-      } catch (error) {
-        throw new UnauthorizedException('Token Google không hợp lệ hoặc đã hết hạn.');
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: dto.token,
+        audience: this.googleClientId, // 🛡️ bắt buộc để chặn giả mạo từ OAuth Client khác
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        throw new UnauthorizedException('Không thể xác thực token Google.');
       }
-    }
-
-    if (!email) {
-      throw new BadRequestException('Không tìm thấy thông tin email từ Google.');
+      if (!payload.email_verified) {
+        throw new UnauthorizedException('Email Google chưa được xác minh.');
+      }
+      email = payload.email;
+      fullName = payload.name || 'Người dùng Google';
+      avatarUrl = payload.picture;
+    } catch (error) {
+      // 🛡️ FIX: không nuốt message cụ thể (VD "Email Google chưa được xác
+      // minh.") — chỉ bọc lại thành message chung cho lỗi THẬT SỰ không rõ
+      // nguồn gốc (VD chữ ký JWT sai/hết hạn từ thư viện google-auth-library).
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Token Google không hợp lệ hoặc đã hết hạn.');
     }
 
     let user = await this.prisma.user.findUnique({ where: { email } });
@@ -230,6 +235,9 @@ export class AuthService {
           passwordHash,
           fullName: fullName || 'Người dùng Google',
           role: 'CUSTOMER',
+          // Chỉ set avatar lúc TẠO MỚI — không ghi đè avatar user đã tự
+          // upload qua Cloudinary nếu tài khoản đã tồn tại từ trước.
+          avatarUrl: avatarUrl || null,
         },
       });
     }
@@ -248,6 +256,7 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        avatarUrl: user.avatarUrl, // ⚡ FIX: đồng bộ với login() thường (trước đây thiếu field này)
         ...tokens,
       },
     };

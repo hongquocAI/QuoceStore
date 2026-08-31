@@ -30,11 +30,23 @@ lạc về đúng chuẩn → Polish chi tiết → Feature gap.
 **✅ Nhóm G — Đợt 1 (Dọn rác + AdminGuard + AiChatWidget + Font) ĐÃ ĐÓNG
 HOÀN TOÀN (2026-08-31).** Chi tiết đầy đủ xem Nhật ký chi tiết. Người dùng
 test UI thật PASS 5/5 mục.
-⏳ **Đợt 2 CHƯA bắt đầu** — chờ người dùng xác nhận. Đợt 2 gồm: kéo
+
+**✅ Nhóm G — Đợt 2 (Đồng bộ Login/Register + Bật Google Login thật) ĐÃ ĐÓNG
+HOÀN TOÀN (2026-08-31).** Phạm vi Đợt 2 đã ĐỔI so với dự kiến ban đầu — 3
+trang `profile`/`orders-lookup`/`change-password` (lệch style Account) DỜI
+sang đợt riêng sau, thay vào đó Đợt 2 gồm 2 phần: (A) đồng bộ
+`register/page.tsx` khớp `login/page.tsx` + link 2 chiều + toggle hiện/ẩn
+mật khẩu + xác nhận mật khẩu + chỉ báo độ mạnh; (B) bật chính thức Google
+Login (`@react-oauth/google`, `GOOGLE_CLIENT_ID` thật). **Phát hiện + sửa 1
+lỗ hổng bảo mật nghiêm trọng** trong lúc khảo sát — xem Nhật ký chi tiết.
+Người dùng test UI thật PASS 12/12 mục. Đã dọn 1 tài khoản test
+(`cbb@gmail.com`), giữ lại tài khoản Google thật của người dùng dùng để
+test (không phải rác).
+
+⏳ **Đợt 3 CHƯA bắt đầu** — chờ người dùng xác nhận. Đợt 3 gồm: kéo
 `profile/page.tsx`, `orders/lookup/page.tsx`, `change-password/page.tsx` về
-đúng chuẩn Account; RIÊNG `register/page.tsx` (lệch nặng nhất) phải trình
-bày bản thiết kế mô tả TRƯỚC để người dùng duyệt, KHÔNG code ngay dù đã
-biết rõ vấn đề — đúng yêu cầu tường minh của người dùng.
+đúng chuẩn Account (mục này vốn là "Đợt 2 gốc", đã dời do người dùng mở
+rộng phạm vi Đợt 2 sang Login/Register + Google).
 
 **✅ Nhóm F (phần 1) — Discount thật vào `OrdersService.create()` ĐÃ XONG**
 (code + verify bằng request thật, dữ liệu test đã dọn sạch).
@@ -1106,3 +1118,95 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   Neon Postgres serverless (tự "ngủ" khi rảnh lâu, xem CLAUDE.md mục "THÔNG
   TIN MÔI TRƯỜNG"), retry sau 5s thấy `up` bình thường, không liên quan gì
   tới thay đổi trong đợt này.
+
+### [2026-08-31] Đã hoàn thành: Nhóm G Đợt 2 — Đồng bộ Login/Register + Bật Google Login thật
+
+- **Phạm vi thay đổi so với dự kiến ban đầu**: người dùng mở rộng Đợt 2 từ
+  "kéo `profile`/`orders-lookup`/`change-password` về chuẩn Account" (dự
+  kiến gốc) sang "đồng bộ Login/Register + bật Google Login thật" — 3 trang
+  kia dời sang đợt riêng sau (gọi là "Đợt 3" trong Trạng thái hiện tại).
+- **🛡️ Lỗ hổng bảo mật NGHIÊM TRỌNG phát hiện qua khảo sát, đã sửa trước
+  khi bật Google Login thật**: `GoogleLoginDto` (gốc từ Phase 0) cho
+  `token` optional và còn nhận `email`/`fullName` trực tiếp từ client.
+  `AuthService.googleLogin()` chỉ verify chữ ký Google trong nhánh
+  `if (dto.token)` — bỏ qua `token` là bỏ qua toàn bộ verify, tin thẳng
+  `email` client tự khai để tìm-hoặc-tạo tài khoản. Trước đó chỉ được cứu
+  vì `GOOGLE_CLIENT_ID` chưa cấu hình (chặn sớm ở đầu hàm) — ngay khi bật
+  thật mà không sửa, đây là lỗ hổng chiếm đoạt tài khoản bất kỳ (POST
+  `{email:"victim@..."}` không cần mật khẩu/token). Đã verify đóng lỗ hổng
+  bằng `curl` thật: body không `token` → **400** (`property email should
+  not exist`, `Thiếu token xác thực Google.`), body `token` giả → **401**
+  rõ ràng (`Token Google không hợp lệ hoặc đã hết hạn.`), không crash.
+- **File đã sửa (backend)**:
+  - `backend/src/auth/dto/auth.dto.ts` — `GoogleLoginDto` chỉ còn đúng 1
+    field `token` (`@IsString() @IsNotEmpty()`), xóa hẳn `email`/
+    `fullName` — 2 field này giờ CHỈ lấy từ payload đã verify chữ ký.
+  - `backend/src/auth/auth.service.ts` — `googleLogin()`: bỏ nhánh
+    `if (dto.token)` (verify luôn bắt buộc); sửa `catch` không nuốt message
+    cụ thể (`instanceof UnauthorizedException` thì `throw` nguyên lỗi, chỉ
+    bọc message chung cho lỗi thật sự không rõ nguồn gốc); map
+    `payload.picture` → `avatarUrl` khi TẠO USER MỚI (không ghi đè avatar
+    đã có nếu user tồn tại từ trước); thêm `avatarUrl` vào response `data`
+    (trước đây thiếu, không đồng bộ với `login()` thường).
+  - `backend/src/app.module.ts` — GIỮ NGUYÊN
+    `GOOGLE_CLIENT_ID: Joi.string().optional()` (quyết định có chủ đích,
+    không đổi `required()` — `AuthService` đã có graceful-degradation sẵn,
+    đổi required() sẽ khiến backend crash toàn bộ nếu biến thiếu ở môi
+    trường nào đó sau này, rủi ro lớn hơn lợi ích cho 1 tính năng phụ trợ).
+- **File đã sửa (frontend)**:
+  - `frontend/src/config/env.ts` — thêm getter `googleClientId` (KHÔNG
+    throw nếu thiếu, khác `apiUrl` — nút Google tự ẩn graceful).
+  - `frontend/src/lib/api.ts` — thêm `/auth/google` vào `SILENT_401_URLS`
+    (401 từ chính endpoint xác thực không kích hoạt vòng lặp refresh-
+    redirect của interceptor).
+  - `frontend/src/app/login/page.tsx` — thêm toggle hiện/ẩn mật khẩu
+    (`Eye`/`EyeOff` từ `lucide-react`, LẦN ĐẦU dùng trong repo — trước đây
+    0 file nào có); thêm link "Chưa có tài khoản? Đăng ký ngay" →
+    `/register` (chiều còn thiếu — Register→Login đã có sẵn từ đầu dự án,
+    Login→Register chưa từng có); thêm nút Google Login (dải phân cách
+    "Hoặc" + `<GoogleLogin>` bọc trong `<GoogleOAuthProvider>` cục bộ,
+    KHÔNG mount ở root layout — chỉ 2 trang cần, tránh tải script Google
+    toàn site); gộp logic xử lý thành công (`handleAuthSuccess`) dùng
+    chung cho cả submit form thường lẫn Google.
+  - `frontend/src/app/register/page.tsx` — viết lại TOÀN BỘ để khớp style
+    `login/page.tsx` (container/card/heading/label/input/error-banner/nút
+    submit — trước đây `font-serif`, `bg-gray-900`, không card, không
+    label, dùng `fetch()` thô thay vì axios `api`). Thêm: field xác nhận
+    mật khẩu (validate client-side trước khi gọi API, không khớp → báo lỗi
+    ngay không gọi API); chỉ báo độ mạnh mật khẩu cơ bản (`getPasswordStrength`,
+    hàm thuần tính điểm dựa độ dài + hoa/số/ký tự đặc biệt, 3 thanh màu +
+    nhãn Yếu/Trung bình/Mạnh); toggle hiện/ẩn cho cả 2 ô mật khẩu; auto-
+    login sau đăng ký (xác nhận `POST /auth/register` backend đã set cookie
+    HttpOnly y hệt `/auth/login` — tái dùng đúng pattern, bỏ hẳn `alert()` +
+    bắt đăng nhập lại thủ công như code cũ); nút Google Login (
+    `text="signup_with"`, cùng logic `handleGoogleSuccess`).
+  - `README.md` — thêm dòng `NEXT_PUBLIC_GOOGLE_CLIENT_ID` vào bảng biến
+    môi trường Frontend (trước đây thiếu hẳn); sửa mô tả dòng
+    `GOOGLE_CLIENT_ID` backend cho khớp trạng thái "đã bật".
+  - `CLAUDE.md` — đổi "Google Login an toàn tắt tạm (chưa dùng thật)"
+    thành "ĐÃ BẬT CHÍNH THỨC", kèm bài học lỗ hổng bảo mật đã sửa để phiên
+    sau không vô tình nới lỏng lại DTO.
+- **KHÔNG làm trong đợt này (cân nhắc sau, không phải lỗi)**: thêm cột
+  `googleId`/migration Prisma để định danh tường minh tài khoản Google —
+  cách match-theo-email hiện tại (chỉ tin khi `payload.email_verified` =
+  true) là pattern hợp lệ, phổ biến, không phải bug.
+- **Đã test**: `npx tsc --noEmit` sạch cả backend lẫn frontend. Backend
+  verify lỗ hổng bằng `curl` thật (xem trên). Người dùng tự test UI thật,
+  xác nhận **12/12 mục PASS**: Register khớp style Login (card/label/viền
+  vuông), toggle mắt cả 2 ô mật khẩu, chỉ báo độ mạnh hoạt động đúng, 2 mật
+  khẩu khác nhau → báo lỗi không gọi API, đăng ký xong tự động đăng nhập
+  (không phải bấm lại); Login có link đăng ký hoạt động + toggle mắt; cả 2
+  trang có nút Google đúng branding, đăng nhập Google thật thành công, F5
+  giữ session (cookie HttpOnly), tài khoản Google mới tự tạo đúng kèm
+  avatar lấy từ Google.
+- **Dọn dữ liệu test**: DB có 2 user tạo trong lúc test hôm nay —
+  `cbb@gmail.com` (rác test Register rõ ràng, tên "ABC") đã XÓA (kèm
+  `refreshToken` liên quan); `hongquoc444@gmail.com` (có avatar Google
+  thật, xác nhận là tài khoản Google THẬT của người dùng dùng để test) —
+  **GIỮ LẠI theo yêu cầu người dùng**, không phải rác cần dọn. Toàn bộ file
+  script Node tạm dùng để kiểm tra/dọn (`_check_recent_users.js`,
+  `_cleanup_test_user.js`) đã xóa sạch khỏi `backend/`.
+- **Lưu ý/vấn đề gặp phải**: Không có vấn đề kỹ thuật nào ngoài dự kiến.
+  Điểm cần cẩn trọng đã xử lý đúng: phân biệt được tài khoản test rác với
+  tài khoản Google thật của người dùng trước khi xóa (đã hỏi xác nhận thay
+  vì tự ý xóa cả 2), tránh xóa nhầm dữ liệu thật.

@@ -101,8 +101,27 @@ NestJS + Prisma + PostgreSQL backend, Next.js frontend) từ 1 phiên làm việ
   @Body('data') string rồi tự JSON.parse), SKU sinh an toàn (check trùng +
   retry), soft-delete khi sản phẩm đã có đơn hàng
 - Auth: xóa hardcoded JWT secret fallback, JwtModule chỉ cấu hình 1 nơi
-  (AuthModule), Refresh Token đầy đủ, Google Login an toàn tắt tạm (chưa dùng
-  thật, GOOGLE_CLIENT_ID optional)
+  (AuthModule), Refresh Token đầy đủ. **Google Login ĐÃ BẬT CHÍNH THỨC
+  (2026-08-31, Nhóm G Đợt 2 Phần B)** — `GOOGLE_CLIENT_ID` đã cấu hình thật
+  trong `.env` cả 2 phía (`GOOGLE_CLIENT_ID` backend,
+  `NEXT_PUBLIC_GOOGLE_CLIENT_ID` frontend), nút "Đăng nhập với Google"
+  hoạt động trên `/login` và `/register` (dùng `@react-oauth/google`, đã
+  có sẵn trong `package.json` từ trước, không cần cài mới). `Joi` vẫn giữ
+  `GOOGLE_CLIENT_ID.optional()` có chủ đích (không đổi `required()`) —
+  `AuthService` constructor đã có graceful-degradation sẵn (thiếu biến →
+  503 rõ ràng, không crash backend), đổi sang required sẽ tăng rủi ro
+  không đáng có cho 1 tính năng phụ trợ.
+  - ⚠️ **BÀI HỌC BẢO MẬT quan trọng — không được nới lỏng lại
+    `GoogleLoginDto`**: bản gốc (Phase 0) cho `token` optional và còn nhận
+    cả `email`/`fullName` từ client. `AuthService.googleLogin()` chỉ
+    verify chữ ký Google trong nhánh `if (dto.token)` — bỏ `token` là bỏ
+    qua toàn bộ verify, tin thẳng `email` client tự khai để tìm-hoặc-tạo
+    tài khoản (chiếm đoạt tài khoản bất kỳ, không cần mật khẩu). Trước đó
+    chỉ được cứu vì `GOOGLE_CLIENT_ID` chưa cấu hình. Đã sửa dứt điểm:
+    `token` giờ **bắt buộc** (`@IsNotEmpty`), `email`/`fullName` đã **xóa
+    hẳn khỏi DTO** — 2 field này CHỈ được lấy từ payload đã verify chữ ký,
+    không bao giờ đọc từ body client gửi lên. Nếu sau này cần sửa
+    `GoogleLoginDto`, PHẢI giữ nguyên nguyên tắc này.
 - Cart: giỏ hàng theo đúng variantId, giá đúng theo biến thể, tồn kho trừ đúng
   theo variant nếu có chọn màu
 
