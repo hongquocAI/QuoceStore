@@ -1,8 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
-import { useRouter } from 'next/navigation';
 import { Paginated } from '@/types';
 
 interface Category {
@@ -94,9 +92,9 @@ function generateSlugFromName(name: string): string {
 }
 
 export default function AdminProductsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-
+  // ⚡ Nhóm G Đợt 1: guard role ADMIN + redirect đã dồn về
+  // app/admin/layout.tsx (AdminGuard) — component này chỉ mount khi chắc
+  // chắn đã xác thực ADMIN, không cần tự check lại `user`/`authLoading`.
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]); // ⚡ MỚI
@@ -176,15 +174,8 @@ export default function AdminProductsPage() {
   }, [formData.specsText]);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user || user.role !== 'ADMIN') {
-        setMessage({ type: 'error', text: 'BẠN KHÔNG CÓ QUYỀN TRUY CẬP TRANG QUẢN TRỊ NÀY!' });
-        setTimeout(() => router.push('/'), 1500);
-      } else {
-        fetchInitialData();
-      }
-    }
-  }, [user, authLoading]);
+    fetchInitialData();
+  }, []);
 
   // ⚡ Nhóm B: tách làm 2 — dữ liệu dropdown (Category/SubCategory/Brand) chỉ
   // cần nạp MỘT LẦN, còn danh sách sản phẩm phải nạp lại mỗi khi đổi
@@ -267,10 +258,8 @@ export default function AdminProductsPage() {
   ]);
 
   useEffect(() => {
-    if (!authLoading && user?.role === 'ADMIN') {
-      fetchProducts();
-    }
-  }, [authLoading, user, fetchProducts]);
+    fetchProducts();
+  }, [fetchProducts]);
 
   // ⚡ UX form Admin (mục 2b) — trích SKU-gen ra hàm thuần, dùng chung cho
   // handleTitleChange (tự động khi gõ Tên) VÀ nút "Sinh lại mã khác" (khi
@@ -700,7 +689,7 @@ export default function AdminProductsPage() {
   // trang ở client trên toàn bộ dữ liệu). `products` giờ CHÍNH LÀ đúng 1
   // trang kết quả đã được server lọc sẵn, render thẳng ra bảng.
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-[70vh] bg-white text-[#111]">
         <span className="tracking-[0.3em] text-xs uppercase font-bold animate-pulse">ĐANG TẢI HỆ THỐNG PIM ENTERPRISE...</span>

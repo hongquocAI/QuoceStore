@@ -359,10 +359,23 @@ field Original Price) trong khi hành vi thật fallback về "Giá bán".
   hơn 1 lần sửa nhỏ, cần thiết kế riêng.
 - Cloudinary orphaned files — xem mục Nhóm E bên dưới.
 
-### 2c. Nhóm G (MỚI, 2026-08-31) — Hoàn thiện Frontend (Polish cho Portfolio)
+### 2c. Nhóm G — Hoàn thiện Frontend (Polish cho Portfolio)
 
-**CHỈ GHI NHẬN LÚC NÀY, CHƯA CODE.** Cần Plan Mode kỹ + audit trước khi thực
-thi bất kỳ thay đổi nào — đây là quyết định thẩm mỹ, không phải bug logic.
+**✅ G1 (Audit toàn diện) ĐÃ XONG (2026-08-31)** — 19 file audit qua 3 agent
+song song, trình bày bảng đầy đủ cho người dùng. Chi tiết phát hiện xem
+PROGRESS.md. Người dùng đã chốt thực thi theo **4 đợt** (thay cho "G3" mô tả
+chung chung bên dưới):
+1. ✅ **Đợt 1 ĐÃ XONG (2026-08-31)** — dọn rác (`CheckoutQr.tsx`,
+   `AdminGuard.tsx` refactor thành single source of truth qua
+   `app/admin/layout.tsx`), `AiChatWidget` ẩn khỏi `/admin/*` + chọn gia
+   đình Account làm chuẩn, dọn xung đột font (3 nguồn → 1 nguồn SF Pro).
+2. ⏳ Đợt 2 (CHƯA bắt đầu) — kéo `profile/page.tsx`, `orders/lookup/
+   page.tsx`, `change-password/page.tsx` về đúng chuẩn Account;
+   `register/page.tsx` (lệch nặng nhất) PHẢI trình bày bản thiết kế mô tả
+   trước để duyệt, không code ngay.
+3. ⏳ Đợt 3 (CHƯA bắt đầu) — polish chi tiết (bao gồm G2 bên dưới).
+4. ⏳ Đợt 4 (CHƯA bắt đầu) — feature gap (review sản phẩm, timeline đơn
+   hàng, chọn item giỏ hàng riêng lẻ, sổ địa chỉ...).
 
 **Bối cảnh — đổi thứ tự ưu tiên toàn dự án:** Người dùng đã xác nhận
 (2026-08-31) mục tiêu chính hiện tại là tạo 1 project HOÀN CHỈNH, ĐẸP để

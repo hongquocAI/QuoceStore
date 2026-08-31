@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Bot, Send, User, Loader2, MessageSquare, X } from 'lucide-react';
+import { Bot, Send, User, Loader2, X } from 'lucide-react';
 
 interface Message {
   sender: 'user' | 'ai';
@@ -10,6 +11,14 @@ interface Message {
 }
 
 export default function AiChatWidget() {
+  // ⚡ Nhóm G Đợt 1: ẩn hẳn khỏi /admin/* — widget "tư vấn mua hàng" vô lý
+  // khi nổi trên trang quản trị. Không thể ẩn từ app/admin/layout.tsx vì
+  // widget được app/layout.tsx (layout CHA) mount ở ngoài {children} của
+  // layout con — layout con không gỡ được phần tử của layout cha. Cách khả
+  // thi duy nhất: tự kiểm tra pathname ngay trong chính widget (đã là
+  // Client Component sẵn).
+  const pathname = usePathname();
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { sender: 'ai', text: 'Xin chào! Tôi là Trợ lý AI QUOCÉ. Bạn cần tìm sản phẩm hoặc tư vấn gì hôm nay?' },
@@ -31,15 +40,25 @@ export default function AiChatWidget() {
         ...prev,
         { sender: 'ai', text: res.data.data.reply },
       ]);
-    } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        { sender: 'ai', text: 'Rất tiếc, đã có lỗi kết nối tới Server AI.' },
-      ]);
+    } catch (error: any) {
+      // 🛡️ Nhóm G Đợt 1: phân biệt rate-limit thật (10 req/phút,
+      // backend/src/ai/ai.controller.ts) với lỗi khác. KHÔNG đổ thẳng
+      // err.response.data.message ra UI cho lỗi 500 — AiService có thể lộ
+      // chi tiết lỗi Gemini nội bộ trong message đó.
+      const status = error?.response?.status;
+      const text =
+        status === 429
+          ? error?.response?.data?.message || 'Bạn gửi hơi nhanh, vui lòng thử lại sau ít phút.'
+          : status === 400
+          ? error?.response?.data?.message || 'Nội dung không hợp lệ, vui lòng thử lại.'
+          : 'Rất tiếc, đã có lỗi kết nối tới Server AI.';
+      setMessages((prev) => [...prev, { sender: 'ai', text }]);
     } finally {
       setLoading(false);
     }
   };
+
+  if (pathname?.startsWith('/admin')) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -47,22 +66,21 @@ export default function AiChatWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="bg-gray-900 hover:bg-black text-white p-4 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 group"
+          className="bg-black hover:bg-gray-800 text-white p-4 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 group"
           aria-label="Mở chat AI"
         >
-          <Bot className="w-6 h-6 text-blue-400 group-hover:rotate-12 transition-transform" />
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span>
+          <Bot className="w-6 h-6 text-white group-hover:rotate-12 transition-transform" />
         </button>
       )}
 
       {/* Khung cửa sổ chat */}
       {isOpen && (
         <div className="w-[360px] sm:w-[400px] bg-white border border-gray-200 rounded-2xl shadow-2xl flex flex-col h-[520px] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-          
+
           {/* Header khung chat */}
-          <div className="bg-gray-900 text-white p-4 flex items-center justify-between">
+          <div className="bg-black text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Bot className="w-5 h-5 text-blue-400" />
+              <Bot className="w-5 h-5 text-white" />
               <div>
                 <h3 className="font-semibold text-sm">QUOCÉ AI Assistant</h3>
                 <p className="text-[10px] text-gray-400">Trợ lý thông minh 24/7</p>

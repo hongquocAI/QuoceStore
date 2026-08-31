@@ -1,8 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
-import { useRouter } from 'next/navigation';
 import { Order, ShippingStatus } from '@/types';
 
 // ⚡ Chưa từng tồn tại dictionary nhãn tiếng Việt cho status ở đâu trong repo
@@ -46,9 +44,9 @@ const ALL_STATUSES: ShippingStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'DEL
 const formatMoney = (n: number) => `${Number(n).toLocaleString('vi-VN')} đ`;
 
 export default function AdminOrdersPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-
+  // ⚡ Nhóm G Đợt 1: guard role ADMIN + redirect đã dồn về
+  // app/admin/layout.tsx (AdminGuard) — component này chỉ mount khi chắc
+  // chắn đã xác thực ADMIN, không cần tự check lại `user`/`authLoading`.
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -63,17 +61,6 @@ export default function AdminOrdersPage() {
 
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-
-  // ⚡ Guard giống hệt admin/products/page.tsx — không dùng AdminGuard.tsx
-  // (dead code, không nơi nào import).
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user || user.role !== 'ADMIN') {
-        setMessage({ type: 'error', text: 'BẠN KHÔNG CÓ QUYỀN TRUY CẬP TRANG QUẢN TRỊ NÀY!' });
-        setTimeout(() => router.push('/'), 1500);
-      }
-    }
-  }, [user, authLoading]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -119,10 +106,8 @@ export default function AdminOrdersPage() {
   }, [currentPage, debouncedSearch, selectedStatusFilter]);
 
   useEffect(() => {
-    if (!authLoading && user?.role === 'ADMIN') {
-      fetchOrders();
-    }
-  }, [authLoading, user, fetchOrders]);
+    fetchOrders();
+  }, [fetchOrders]);
 
   const handleUpdateStatus = async (order: Order, nextStatus: ShippingStatus) => {
     // ⚠️ GIỚI HẠN QUAN TRỌNG: hệ thống CHỈ tự động hoàn kho khi hủy đơn,
@@ -155,14 +140,6 @@ export default function AdminOrdersPage() {
       setUpdatingId(null);
     }
   };
-
-  if (authLoading) {
-    return (
-      <div className="flex justify-center items-center h-[70vh] bg-white text-[#111]">
-        <span className="tracking-[0.3em] text-xs uppercase font-bold animate-pulse">ĐANG KIỂM TRA QUYỀN TRUY CẬP...</span>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white text-[#111] font-sans antialiased pb-28">

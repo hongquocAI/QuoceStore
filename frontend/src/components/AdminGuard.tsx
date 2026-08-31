@@ -14,7 +14,19 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     }
   }, [user, loading, router]);
 
-  if (loading) return <div className="p-10 text-center">Đang kiểm tra quyền truy cập...</div>;
+  // ⚡ Nhóm G Đợt 1: single source of truth cho guard Admin — thay thế
+  // logic lặp lại 1:1 từng có ở admin/orders/page.tsx và
+  // admin/products/page.tsx (xem app/admin/layout.tsx). Style khớp
+  // convention loading sẵn có của 2 trang Admin (font-sans uppercase).
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-[70vh] bg-white text-[#111] font-sans antialiased">
+        <span className="tracking-[0.3em] text-xs uppercase font-bold animate-pulse">
+          ĐANG KIỂM TRA QUYỀN TRUY CẬP...
+        </span>
+      </div>
+    );
+  }
   if (!user || user.role !== 'ADMIN') return null;
 
   return <>{children}</>;

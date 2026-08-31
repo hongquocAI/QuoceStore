@@ -14,9 +14,28 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-08-30)*
+*(cập nhật lần cuối: 2026-08-31)*
 
 ### Đang làm / Việc tiếp theo ngay
+**✅ Nhóm G (MỚI, portfolio polish) — G1 (Audit toàn diện Frontend) ĐÃ
+XONG (2026-08-31)** — 19 file trong `frontend/src/app` + `components` đã
+audit qua 3 agent song song, trình bày bảng đầy đủ cho người dùng. Phát
+hiện chính: "gia đình Account" không đồng nhất thật (profile, orders/
+lookup, change-password đang lệch mang style Storefront); `register/
+page.tsx` lệch nặng nhất dự án; `AiChatWidget` tự tạo gia đình thứ 4; 2 file
+dead code (`CheckoutQr.tsx`, `AdminGuard.tsx`); xung đột font 3 nguồn.
+Người dùng đã chốt thứ tự 4 đợt: Dọn rác + AiChatWidget + font → Kéo trang
+lạc về đúng chuẩn → Polish chi tiết → Feature gap.
+
+**✅ Nhóm G — Đợt 1 (Dọn rác + AdminGuard + AiChatWidget + Font) ĐÃ ĐÓNG
+HOÀN TOÀN (2026-08-31).** Chi tiết đầy đủ xem Nhật ký chi tiết. Người dùng
+test UI thật PASS 5/5 mục.
+⏳ **Đợt 2 CHƯA bắt đầu** — chờ người dùng xác nhận. Đợt 2 gồm: kéo
+`profile/page.tsx`, `orders/lookup/page.tsx`, `change-password/page.tsx` về
+đúng chuẩn Account; RIÊNG `register/page.tsx` (lệch nặng nhất) phải trình
+bày bản thiết kế mô tả TRƯỚC để người dùng duyệt, KHÔNG code ngay dù đã
+biết rõ vấn đề — đúng yêu cầu tường minh của người dùng.
+
 **✅ Nhóm F (phần 1) — Discount thật vào `OrdersService.create()` ĐÃ XONG**
 (code + verify bằng request thật, dữ liệu test đã dọn sạch).
 
@@ -973,3 +992,117 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   script Node mô phỏng thuần túy, không gọi API thật). CLAUDE.md mục 2b và
   mục "Cảnh báo tồn kho thấp" (đã xong từ việc trước nhưng CLAUDE.md quên
   cập nhật) đều đã sửa lại khớp thực tế, đúng nguyên tắc #10.
+
+### [2026-08-31] Đã hoàn thành: G1 — Audit toàn diện Frontend (Nhóm G)
+
+- **Phạm vi**: đọc-only, không sửa gì. 3 agent Explore chạy song song, mỗi
+  agent phụ trách 1 nhóm file dự đoán (Storefront 7 file, Account 7 file,
+  Admin+layout+misc 5 file) — đủ 19 file trong `frontend/src/app` và
+  `frontend/src/components`.
+- **Phát hiện chính** (đã trình bày bảng đầy đủ cho người dùng trong chat):
+  1. "Gia đình Account" KHÔNG đồng nhất thật — chỉ `cart`/`checkout`/
+     `orders` đúng chuẩn (`bg-[#fafafc]`, `rounded-2xl/3xl`, `font-serif`).
+     `profile/page.tsx` và `orders/lookup/page.tsx` đang mang nhầm style
+     Storefront (`bg-white`, `rounded-none`, uppercase-bold) dù nằm trong
+     route Account; `change-password/page.tsx` pha trộn không thuộc hẳn
+     bên nào.
+  2. `register/page.tsx` lệch nặng nhất toàn dự án — `font-serif` (đáng lẽ
+     Storefront phải uppercase-bold), `bg-gray-900` thay vì `bg-black`,
+     không card bọc, không brand mark, khác hẳn `login/page.tsx` liền kề.
+  3. `AiChatWidget.tsx` tự tạo "gia đình thứ 4" — pha trộn bo góc Account +
+     tông đen-xám Storefront + màu `blue-400`/`emerald-500` ngoài cả 2
+     palette đã chốt.
+  4. 2 file dead code: `CheckoutQr.tsx` (không ai import, UI test lộ
+     UUID picker + `alert()`) và `AdminGuard.tsx` (2 trang Admin tự viết
+     lặp lại logic guard, không dùng file này — chính comment trong code
+     cũ cũng tự thừa nhận).
+  5. Feature gap thật (không chỉ polish): giỏ hàng không chọn item riêng
+     để thanh toán, checkout không progress-step, sản phẩm không review/
+     liên quan, orders không timeline trực quan, profile không quản lý
+     nhiều địa chỉ, Category Admin phải seed DB tay (không tạo được qua
+     UI), Header mobile mất hoàn toàn navigation.
+- **Quyết định của người dùng sau khi xem audit**: chốt thứ tự 4 đợt sửa —
+  Đợt 1 (dọn rác + AiChatWidget + font) → Đợt 2 (kéo trang lạc về đúng
+  chuẩn, gồm cả `register.tsx`) → Đợt 3 (polish chi tiết) → Đợt 4 (feature
+  gap). Yêu cầu tường minh: khi tới `register.tsx` phải trình bày bản
+  thiết kế mô tả TRƯỚC để duyệt, không code ngay dù đã biết rõ vấn đề.
+
+### [2026-08-31] Đã hoàn thành: Nhóm G Đợt 1 — Dọn rác + AdminGuard + AiChatWidget + Font
+
+- **File đã sửa/xóa/tạo**:
+  - **Xóa** `frontend/src/components/CheckoutQr.tsx` — xác nhận qua grep
+    không ai import trước khi xóa.
+  - **Tạo mới** `frontend/src/app/admin/layout.tsx` — layout lồng Next.js
+    App Router bọc `<AdminGuard>{children}</AdminGuard>`, tự động áp dụng
+    cho MỌI route `/admin/*` hiện tại lẫn tương lai.
+  - **Sửa** `frontend/src/components/AdminGuard.tsx` — cải thiện style màn
+    hình loading (khớp convention `font-sans uppercase` sẵn có của 2 trang
+    Admin) vì giờ nó là màn hình loading DUY NHẤT thay cho 2 bản trước đây.
+  - **Sửa** `frontend/src/app/admin/orders/page.tsx` và
+    `admin/products/page.tsx` — xóa hẳn khối `useEffect` check
+    `user.role !== 'ADMIN'` + `setTimeout` redirect trùng lặp 1:1 giữa 2
+    trang (AdminGuard đảm nhiệm); xóa import `useAuth`/`useRouter` không
+    còn dùng; đơn giản hóa effect fetch dữ liệu (bỏ điều kiện
+    `authLoading`/`user?.role` vì con chỉ mount khi chắc chắn ADMIN); bỏ
+    nhánh early-return `authLoading` trong màn hình loading (chỉ giữ
+    `loading` của data fetch riêng từng trang).
+  - **Sửa** `frontend/src/components/AiChatWidget.tsx`:
+    - Thêm `usePathname()` (từ `next/navigation`, lần đầu dùng trong repo)
+      → `if (pathname?.startsWith('/admin')) return null;` — cách khả thi
+      DUY NHẤT để ẩn widget khỏi `/admin/*`, vì widget được `app/layout.tsx`
+      (layout CHA, Server Component) mount NGOÀI `{children}` của
+      `app/admin/layout.tsx` — layout con không thể gỡ phần tử của layout
+      cha, chỉ có thể tự ẩn từ bên trong chính widget.
+    - Chọn **Account** làm gia đình style chuẩn cho widget (không phải
+      Storefront) — widget vốn đã ~90% theo ngôn ngữ Account
+      (`rounded-2xl`, `bg-[#fafafc]`), và ngữ nghĩa "trợ lý AI hỗ trợ" khớp
+      tinh thần ấm áp của Account hơn Storefront (marketing, tương phản
+      mạnh).
+    - Xóa `text-blue-400` (2 chỗ) → `text-white`; xóa hẳn chấm "online"
+      giả (`bg-emerald-500 animate-pulse`, không gắn trạng thái thật nào);
+      đổi `bg-gray-900` → `bg-black` (khớp tông đen thuần CTA chính của
+      Account); xóa import `MessageSquare` từ `lucide-react` (dead import).
+    - Sửa xử lý lỗi API: phân biệt `429` (rate-limit thật, 10 req/phút —
+      hiện đúng message backend trả) và `400` (validate) với lỗi khác;
+      KHÔNG đổ thẳng `err.response.data.message` ra UI cho lỗi 500 (
+      `AiService` có thể lộ chi tiết lỗi Gemini nội bộ trong message).
+  - **Sửa** `frontend/src/app/layout.tsx` — xóa import `Inter` từ
+    `next/font/google` và bỏ `inter.className` khỏi `<body>`.
+- **Phát hiện quan trọng trong lúc điều tra font** (không phải suy đoán —
+  xác nhận bằng CSS specificity + grep thật): 3 font đang CÙNG LÚC render ở
+  3 vùng khác nhau của site trước khi sửa:
+  1. SF Pro (8 trang Storefront + 2 trang Admin, qua class `font-sans`
+     tường minh — Tailwind `tailwind.config.js` đã override
+     `theme.extend.fontFamily.sans` thành stack SF Pro).
+  2. Serif mặc định Tailwind (Georgia/Times, KHÔNG phải font brand nào —
+     `fontFamily.serif` không hề bị override) — chỉ riêng heading Account
+     qua `font-serif`.
+  3. Inter — toàn bộ phần còn lại của trang Account (thân bài/input/nút,
+     không có class font nào nên kế thừa thẳng từ `<body>`).
+  `globals.css` đã khai báo sẵn đúng ý định (SF Pro trên `body`) từ đầu
+  nhưng bị `inter.className` (class-selector trên `<body>`) che mất hoàn
+  toàn — class-selector luôn thắng element-selector bất kể `@layer`. SF Pro
+  được khai báo tường minh ở 3 nơi độc lập (tailwind.config, globals.css,
+  8 trang) trong khi không trang nào chủ động muốn Inter — kết luận Inter
+  chỉ là boilerplate `create-next-app` sót lại, chưa từng có chủ đích. Bỏ
+  Inter → `globals.css` tự thắng, dồn về đúng 1 nguồn font thân bài nhất
+  quán toàn site, `font-serif` heading Account vẫn giữ nguyên làm điểm nhấn
+  có chủ đích (không tính là "nguồn xung đột").
+- **Đã test**: `npx tsc --noEmit` sạch sau mỗi bước. Không có trình duyệt
+  tự động trong phiên này — người dùng tự test UI thật, xác nhận **5/5 mục
+  PASS**:
+  1. Vào `/admin/*` khi không phải ADMIN → đá về `/` NGAY, không còn thấy
+     UI admin thoáng qua 1.5s trước khi redirect.
+  2. `AiChatWidget` ẩn hoàn toàn trên mọi route `/admin/*`.
+  3. Widget hết 2 màu lạc tông + chấm online giả trên các trang khác.
+  4. Gọi chat AI vượt rate-limit → hiện đúng message rate-limit thay vì
+     "lỗi kết nối" chung chung.
+  5. Font thân bài nhất quán giữa Storefront và Account khi quan sát trực
+     quan (không còn cảm giác lệch font giữa 2 khu vực).
+  Không có dữ liệu DB nào tạo ra trong quá trình test (thay đổi thuần UI/
+  code) — không cần dọn dẹp gì thêm.
+- **Lưu ý/vấn đề gặp phải**: Trong lúc khởi động lại kiểm tra, `GET /health`
+  báo `database.status: down` 1 lần — xác nhận đây là đặc tính đã biết của
+  Neon Postgres serverless (tự "ngủ" khi rảnh lâu, xem CLAUDE.md mục "THÔNG
+  TIN MÔI TRƯỜNG"), retry sau 5s thấy `up` bình thường, không liên quan gì
+  tới thay đổi trong đợt này.
