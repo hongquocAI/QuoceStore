@@ -18,6 +18,56 @@
 
 ### Đang làm / Việc tiếp theo ngay
 
+**✅ Đợt 4 Nhóm G (Feature gap) — 4/8 việc ĐÃ LÀM, 4/8 việc TREO LẠI
+(2026-09-02, làm tự động qua đêm).** G1 audit (2026-08-31) liệt kê 7 gap
+thật; sau khảo sát code, tách "review sản phẩm" thành 2 phần → tổng 8 mục
+đánh giá. Đã làm 4 việc rủi ro thấp, không cần quyết định kiến trúc lớn
+(mirror pattern có sẵn trong dự án hoặc tận dụng API/component đã có):
+- **Việc A — Category Admin CRUD**: backend module mới `categories/`
+  (mirror 1:1 `brands/`/`sub-categories/`), `admin/products/page.tsx` có
+  nút "+ Thêm mới" cho Danh mục chính (trước đây phải seed DB tay). Test
+  PASS qua API thật (tạo → cache invalidate đúng → xóa → xác nhận đã xóa).
+- **Việc B — Header mobile navigation**: hamburger menu, trước đây mobile
+  mất hoàn toàn "Cửa hàng"/"Phụ kiện"/"Tra cứu đơn".
+- **Việc C — Orders timeline trực quan**: stepper 4 bước trong modal chi
+  tiết `/orders` + `/orders/lookup`, dùng data đã có sẵn.
+- **Việc D — Sản phẩm liên quan**: trang chi tiết sản phẩm, tái dùng API
+  phân trang + `ProductCard` có sẵn, xác nhận filter đúng qua request thật.
+
+`tsc --noEmit` (backend + frontend) + `npm run build` (frontend) sạch sau
+mỗi việc và tổng kết cuối. 4 commit riêng biệt, đã push.
+
+**⚠️ Cần người dùng xác nhận — 4 việc treo lại, KHÔNG làm (đúng chỉ đạo
+"cần quyết định kiến trúc lớn thì ghi lại, không tự làm"):**
+1. **Cart chọn item riêng để checkout** + **Checkout progress-step UI** —
+   về kỹ thuật khả thi không cần quyết định kiến trúc, NHƯNG cả 2 đụng
+   trực tiếp `cart.tsx`/`checkout.tsx`/`CartContext` — đúng nhóm file vừa
+   qua nhiều vòng sửa lỗi tiền/kho nghiêm trọng đêm nay (Hướng B, polling).
+   **Quyết định thận trọng có chủ đích**: không tự ý sửa tiếp file thanh
+   toán khi không có người theo dõi UI thật lúc code. Nếu muốn làm, nên
+   làm có người dùng theo dõi trực tiếp, không phải qua đêm tự động.
+2. **Review sản phẩm** — cần quyết định kiến trúc thật: thêm bảng `Review`
+   (migration), chính sách kiểm duyệt (tự động hiện hay cần Admin duyệt?),
+   ai được review (chỉ người đã mua hay bất kỳ user nào?), có tính rating
+   trung bình lưu vào `Product` không?
+3. **Profile — sổ địa chỉ nhiều địa chỉ** — cần bảng `Address` mới
+   (migration), CRUD đầy đủ, và quyết định checkout chọn địa chỉ nào (mặc
+   định? chọn lúc checkout?).
+
+**🔍 Cần người dùng kiểm tra bằng mắt (Đợt 4, chưa test UI thật)**:
+1. `/admin/products` → mở form Thêm sản phẩm → bấm "+ Thêm mới" cạnh
+   "Danh mục chính" → tạo thử 1 danh mục → xác nhận xuất hiện ngay trong
+   dropdown không cần F5.
+2. Thu nhỏ trình duyệt (hoặc DevTools responsive) → xác nhận hamburger
+   menu xuất hiện, mở/đóng đúng, các link hoạt động.
+3. `/orders` (đăng nhập, có đơn) → "Xem chi tiết" → xác nhận stepper hiện
+   đúng bước hiện tại; `/orders/lookup` tra cứu 1 đơn → xác nhận tương tự.
+   Nếu tiện, đổi thử `shippingStatus` 1 đơn qua `/admin/orders` rồi quay
+   lại `/orders` xem stepper cập nhật đúng.
+4. Vào 1 trang chi tiết sản phẩm có sản phẩm khác cùng SubCategory → xác
+   nhận section "Sản phẩm liên quan" hiện đúng, không hiện sản phẩm đang
+   xem trong danh sách đó.
+
 **✅ G2 — Dynamic list Highlights/Specs (Admin Products) ĐÃ ĐÓNG HOÀN TOÀN
 (2026-09-02, làm tự động qua đêm).** Thay 2 textarea thô (`highlightsText`,
 `specsText` JSON tay) bằng dynamic list `highlights: string[]` +
@@ -1891,3 +1941,80 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   (test UI thật — thêm/xóa hàng, mở Sửa sản phẩm có specs/highlights có
   sẵn) đã ghi vào mục "🔍 Cần người dùng kiểm tra" ở Trạng thái hiện tại,
   không block gì tiếp.
+
+### [2026-09-02] Đã hoàn thành: Đợt 4 Nhóm G (Feature gap) — 4 việc, làm tự động qua đêm
+
+- **Bối cảnh**: người dùng giao tự đánh giá 7 gap trong G1 audit (PROGRESS.md
+  `[2026-08-31]`), làm ngay việc không cần quyết định kiến trúc lớn, treo
+  lại việc cần. Vào Plan Mode khảo sát code thật trước khi phân loại (đọc
+  `brands/`, `sub-categories/` làm pattern tham chiếu; `Header.tsx`;
+  `orders/page.tsx` modal G4; `product/[slug]/page.tsx`; `QueryProductDto`
+  đã có filter `subCategoryId` từ Nhóm B).
+- **Sự cố nhỏ trong lúc verify Việc A**: `curl http://localhost:5000/health`
+  trả `000` (không kết nối được) ngay sau khi sửa file `categories/` —
+  tưởng backend đã tắt (terminal người dùng có thể đã đóng lúc đi ngủ), tự
+  chạy `npm run start:dev` ở background để verify. Gặp `EADDRINUSE :::5000`
+  — hóa ra backend GỐC vẫn đang chạy (`nest --watch` tự restart sau khi tôi
+  sửa file, `curl` chỉ trúng đúng khoảng vài giây restart). Đã `TaskStop`
+  ngay tiến trình mới tạo (dư thừa, bị lỗi bind), xác nhận lại backend gốc
+  vẫn khỏe (`curl` 200) trước khi tiếp tục — không có tiến trình lạ nào bị
+  giết nhầm.
+- **Việc A — Category Admin CRUD**:
+  - `backend/src/categories/` (MỚI): `dto/create-category.dto.ts`
+    (`name`, `slug`, mirror đúng `CreateSubCategoryDto`, KHÔNG thêm
+    `description` dù Category có field này — giữ tối giản);
+    `categories.service.ts` (`create()` check trùng slug, `remove()` chặn
+    xóa nếu còn sản phẩm — mirror `SubCategoriesService`); ghi rõ comment
+    "phụ thuộc chéo module": cache key `'categories:all'` vốn do
+    `ProductService.findAllCategories()` sở hữu, phải invalidate đúng key
+    này dù nằm ở service khác; `categories.controller.ts` (`POST`/
+    `DELETE :id`, `JwtAuthGuard+RolesGuard+@Roles(ADMIN)+@Audit`, KHÔNG
+    thêm `GET` vì đã có `GET /products/categories`); `categories.module.ts`.
+  - `backend/src/app.module.ts` — đăng ký `CategoriesModule`.
+  - `frontend/src/app/admin/products/page.tsx` — `quickAddModal.type` mở
+    rộng thêm `'category'`; `handleQuickAddSubmit()` thêm nhánh gọi
+    `POST /categories`; nút "+ Thêm mới" cạnh label "Danh mục chính"; JSX
+    mini-modal thêm tiêu đề/placeholder cho `category` (không hiện field
+    Logo URL, chỉ Brand có).
+  - **Test PASS qua API thật** (script tạm `_test_categories_temp.js`, đã
+    xóa ngay sau khi chạy): tạo Category test → `GET /products/categories`
+    thấy ngay (cache invalidate đúng) → xóa → xác nhận không còn trong
+    list. Không có dữ liệu test sót lại.
+- **Việc B — Header mobile navigation**: `frontend/src/components/
+  Header.tsx` — thêm state `mobileMenuOpen`; nút hamburger (`☰`/`✕`,
+  `md:hidden`) đặt cạnh giỏ hàng; panel `<nav>` dọc `md:hidden` chứa ĐÚNG
+  các link đang có trong `<nav>` desktop (Cửa hàng, Phụ kiện, Tra cứu đơn
+  nếu chưa đăng nhập), đóng menu khi bấm link. Không đụng logic dropdown
+  tài khoản.
+- **Việc C — Orders timeline trực quan**: `frontend/src/lib/
+  orderLabels.ts` — thêm `SHIPPING_STATUS_ORDER` (thứ tự tuyến tính,
+  CANCELLED tách riêng). `orders/page.tsx` (modal `detailOrder`) +
+  `orders/lookup/page.tsx` — thêm stepper ngang 4 bước (ô số + nhãn, bước
+  đã qua tô đen, bước hiện tại có `ring`, bước sau xám nhạt, đường nối màu
+  theo tiến độ); nếu `CANCELLED`, hiện dòng cảnh báo đỏ thay stepper. JSX
+  lặp lại y hệt ở 2 file (KHÔNG tách component riêng — chỉ 2 chỗ dùng,
+  theo đúng tinh thần dự án "vài dòng lặp còn hơn tách sớm").
+- **Việc D — Sản phẩm liên quan**: `frontend/src/app/product/[slug]/
+  page.tsx` — import `ProductCard` có sẵn; state `relatedProducts`;
+  `useEffect` phụ (khóa theo `product?.subCategoryId`) gọi lại
+  `GET /products?subCategoryId=X&limit=5` (dùng `fetch` như file này đang
+  dùng, không đổi sang `api` instance), lọc bỏ chính sản phẩm đang xem,
+  giữ tối đa 4; section "Sản phẩm liên quan" full-width dưới 2 cột, ẩn hẳn
+  nếu mảng rỗng. Xác nhận filter đúng qua request thật (read-only, không
+  tạo dữ liệu test): sample product cùng subCategory trả về đúng 3 item
+  gồm cả chính nó (sẽ bị lọc ở frontend).
+- **File đã sửa/tạo tổng cộng**: 4 file backend mới (`categories/*`),
+  1 dòng sửa `app.module.ts`, 5 file frontend sửa (`admin/products/
+  page.tsx`, `Header.tsx`, `orderLabels.ts`, `orders/page.tsx`,
+  `orders/lookup/page.tsx`, `product/[slug]/page.tsx`) — 4 commit riêng
+  biệt theo đúng quy ước, đã push từng commit.
+- **Đã test (tự động hóa được)**: `npx tsc --noEmit` sạch sau MỖI việc (cả
+  backend lẫn frontend). `npm run build` (production) cuối cùng — thành
+  công, cả 17 route (gồm 3 route pháp lý từ Nhóm D, `admin/products`,
+  `orders`, `product/[slug]`...) compile/pre-render đúng.
+- **KHÔNG làm** (đúng phân loại đã chốt trong Plan): cart chọn item riêng,
+  checkout progress-step, review sản phẩm, sổ địa chỉ — lý do chi tiết ghi
+  ở mục "Cần người dùng xác nhận" phần Trạng thái hiện tại.
+- **Lưu ý/vấn đề gặp phải**: ngoài sự cố nhỏ port 5000 đã nêu trên (không
+  gây hậu quả, xử lý đúng cách — kiểm tra trước khi hành động, không giết
+  tiến trình bừa), không có vấn đề kỹ thuật nào khác ngoài dự kiến.

@@ -383,18 +383,27 @@ field Original Price) trong khi hành vi thật fallback về "Giá bán".
 **✅ G1 (Audit toàn diện) ĐÃ XONG (2026-08-31)** — 19 file audit qua 3 agent
 song song, trình bày bảng đầy đủ cho người dùng. Chi tiết phát hiện xem
 PROGRESS.md. Người dùng đã chốt thực thi theo **4 đợt** (thay cho "G3" mô tả
-chung chung bên dưới):
+chung chung bên dưới) — LƯU Ý: thực tế triển khai lệch khá nhiều so với mô
+tả gốc dưới đây, xem PROGRESS.md để biết chi tiết chính xác từng đợt:
 1. ✅ **Đợt 1 ĐÃ XONG (2026-08-31)** — dọn rác (`CheckoutQr.tsx`,
    `AdminGuard.tsx` refactor thành single source of truth qua
    `app/admin/layout.tsx`), `AiChatWidget` ẩn khỏi `/admin/*` + chọn gia
    đình Account làm chuẩn, dọn xung đột font (3 nguồn → 1 nguồn SF Pro).
-2. ⏳ Đợt 2 (CHƯA bắt đầu) — kéo `profile/page.tsx`, `orders/lookup/
-   page.tsx`, `change-password/page.tsx` về đúng chuẩn Account;
-   `register/page.tsx` (lệch nặng nhất) PHẢI trình bày bản thiết kế mô tả
-   trước để duyệt, không code ngay.
-3. ⏳ Đợt 3 (CHƯA bắt đầu) — polish chi tiết (bao gồm G2 bên dưới).
-4. ⏳ Đợt 4 (CHƯA bắt đầu) — feature gap (review sản phẩm, timeline đơn
-   hàng, chọn item giỏ hàng riêng lẻ, sổ địa chỉ...).
+2. ✅ **ĐÃ XONG qua nhiều đợt nhỏ (2026-09-01, "Hướng B đảo ngược")** —
+   phạm vi đổi hẳn: KHÔNG kéo về "chuẩn Account" như dự kiến gốc (quyết
+   định "2 gia đình style" đã bị ĐẢO NGƯỢC), mà thống nhất TOÀN SITE về 1
+   style vuông vức (xem mục "Định hướng thiết kế đã CHỐT" bên dưới) —
+   `profile`/`orders-lookup`/`change-password`/`cart`/`checkout`/
+   `orders`/`register`/`login` đều đã áp dụng đúng style thống nhất này.
+3. ✅ **G2 ĐÃ XONG (2026-09-02)** — dynamic list Highlights/Specs Admin
+   Products (xem mục G2 bên dưới).
+4. ✅ **Đợt 4 (feature gap) — 4/8 việc ĐÃ XONG, 4/8 việc TREO LẠI
+   (2026-09-02)**: ĐÃ làm Category Admin CRUD, Header mobile nav, orders
+   timeline trực quan, sản phẩm liên quan. TREO LẠI (cần người dùng quyết
+   định kiến trúc): cart chọn item riêng để checkout, checkout
+   progress-step, review sản phẩm (cần bảng `Review` + chính sách kiểm
+   duyệt), sổ địa chỉ (cần bảng `Address` + tích hợp checkout). Chi tiết
+   đầy đủ xem PROGRESS.md `[2026-09-02]` mục "Đợt 4 Nhóm G".
 
 **Bối cảnh — đổi thứ tự ưu tiên toàn dự án:** Người dùng đã xác nhận
 (2026-08-31) mục tiêu chính hiện tại là tạo 1 project HOÀN CHỈNH, ĐẸP để
