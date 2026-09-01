@@ -144,10 +144,30 @@ export default function CheckoutPage() {
     return (
       <div className="min-h-screen bg-white text-[#111] font-sans antialiased pt-16 pb-28 px-6">
         <div className="max-w-xl mx-auto bg-white border-2 border-black rounded-none p-8 text-center">
-          <div className="w-16 h-16 bg-black flex items-center justify-center mx-auto mb-6">
-            <span className="text-white text-2xl font-black">✓</span>
-          </div>
-          <h1 className="text-2xl font-black uppercase tracking-[0.2em] text-gray-900 mb-2">Đặt hàng thành công!</h1>
+          {/* 🛡️ Hướng B (2026-09-02): VietQR chỉ THỰC SỰ thành công khi
+              webhook xác nhận PAID (tiền đã về) — đơn lúc này vẫn PENDING,
+              tồn kho CHƯA bị trừ (xem OrdersService.create()). Không dùng
+              chữ "thành công" cho tới lúc đó, tránh hiểu nhầm là đã xong. */}
+          {paymentMethod === 'BANK_TRANSFER' ? (
+            <>
+              <div className="w-16 h-16 border-2 border-black flex items-center justify-center mx-auto mb-6">
+                <span className="text-black text-2xl font-black">⏳</span>
+              </div>
+              <h1 className="text-2xl font-black uppercase tracking-[0.2em] text-gray-900 mb-2">
+                Đơn hàng đã được ghi nhận
+              </h1>
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
+                Vui lòng quét mã để hoàn tất thanh toán
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 bg-black flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-black">✓</span>
+              </div>
+              <h1 className="text-2xl font-black uppercase tracking-[0.2em] text-gray-900 mb-2">Đặt hàng thành công!</h1>
+            </>
+          )}
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-6">
             Mã đơn hàng: <span className="text-gray-900">#{orderResult.orderCode}</span>
           </p>

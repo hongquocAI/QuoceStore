@@ -3,15 +3,22 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { PAYMENT_STATUS_LABEL } from '@/lib/orderLabels';
+import { getPaymentStatusDisplay } from '@/lib/orderLabels';
 
 // ⚡ Nhóm G Đợt C: badge vuông đen-trắng/đỏ theo chuẩn Storefront, dùng
-// PAYMENT_STATUS_LABEL dùng chung (frontend/src/lib/orderLabels.ts) — trước
-// đây hiện thẳng mã status thô (PENDING/PAID) không dịch, không đồng bộ với
-// nhãn tiếng Việt đã có sẵn ở admin/orders/page.tsx.
-function getPaymentStatusBadge(status: string): string {
-  if (status === 'PAID') return 'bg-black text-white';
-  if (status === 'CANCELLED' || status === 'FAILED') return 'bg-red-600 text-white';
+// getPaymentStatusDisplay() dùng chung (frontend/src/lib/orderLabels.ts) —
+// trước đây hiện thẳng mã status thô (PENDING/PAID) không dịch, không đồng
+// bộ với nhãn tiếng Việt đã có sẵn ở admin/orders/page.tsx.
+// 🛡️ Hướng B (2026-09-02): thêm nhánh amber riêng cho VietQR PENDING (tiền
+// chưa về) — không dùng chung màu xám trung tính với COD PENDING (bình
+// thường, sẽ trả khi nhận hàng), tránh gây hiểu nhầm là 2 trạng thái giống
+// nhau.
+function getPaymentStatusBadge(order: { paymentStatus: string; paymentMethod?: string }): string {
+  if (order.paymentStatus === 'PAID') return 'bg-black text-white';
+  if (order.paymentStatus === 'CANCELLED' || order.paymentStatus === 'FAILED') return 'bg-red-600 text-white';
+  if (order.paymentStatus === 'PENDING' && order.paymentMethod === 'BANK_TRANSFER') {
+    return 'bg-amber-100 text-amber-800 border border-amber-300';
+  }
   return 'bg-gray-100 text-gray-700 border border-gray-300';
 }
 
@@ -76,8 +83,8 @@ export default function OrdersHistoryPage() {
               <div key={order.id} className="bg-white border border-gray-200 rounded-none p-6">
                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-100">
                   <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Mã đơn: #{order.orderCode || order.id?.slice(0, 8)}</p>
-                  <span className={`text-[10px] px-3 py-1.5 rounded-none uppercase font-black tracking-widest ${getPaymentStatusBadge(order.paymentStatus)}`}>
-                    {PAYMENT_STATUS_LABEL[order.paymentStatus] || order.paymentStatus}
+                  <span className={`text-[10px] px-3 py-1.5 rounded-none uppercase font-black tracking-widest ${getPaymentStatusBadge(order)}`}>
+                    {getPaymentStatusDisplay(order)}
                   </span>
                 </div>
 

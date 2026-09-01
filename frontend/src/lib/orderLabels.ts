@@ -17,3 +17,16 @@ export const SHIPPING_STATUS_LABEL: Record<ShippingStatus, string> = {
   DELIVERED: 'Đã giao hàng',
   CANCELLED: 'Đã hủy',
 };
+
+// 🛡️ Hướng B (2026-09-02): VietQR PENDING KHÔNG được gọi mập mờ là "Chưa
+// thanh toán" giống COD PENDING (COD PENDING là trạng thái bình thường —
+// khách sẽ trả tiền khi nhận hàng). VietQR PENDING nghĩa là tiền CHƯA về,
+// tồn kho CHƯA bị trừ (xem OrdersService.create() + PaymentService.
+// handleWebhook()) — cần label riêng để khách/admin không hiểu nhầm là đơn
+// đã chốt xong. Dùng chung cho orders/page.tsx và orders/lookup/page.tsx.
+export function getPaymentStatusDisplay(order: { paymentStatus: string; paymentMethod?: string }): string {
+  if (order.paymentStatus === 'PENDING' && order.paymentMethod === 'BANK_TRANSFER') {
+    return 'Đang chờ thanh toán';
+  }
+  return PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus;
+}

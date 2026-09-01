@@ -64,6 +64,14 @@ export class OrdersService {
 
         let computedTotalAmount = 0;
 
+        // 🛡️ Hướng B (2026-09-02): COD = trừ kho ngay (đặt đơn = cam kết,
+        // giữ nguyên hành vi cũ). VietQR = KHÔNG trừ kho lúc tạo đơn — đơn
+        // chỉ chắc chắn khi PaymentService.handleWebhook() xác nhận PAID
+        // thật (tiền đã về). Tránh "hết hàng ảo" nếu khách bỏ ngang không
+        // quét mã. Validate tồn kho (throw nếu không đủ) vẫn chạy như cũ
+        // cho CẢ 2 trường hợp — chỉ khác ở bước GHI xuống DB.
+        const shouldDeductStockNow = (createOrderDto.paymentMethod || 'COD') !== 'BANK_TRANSFER';
+
         const cartItems = createOrderDto.cart || [];
         if (cartItems.length === 0) {
           throw new BadRequestException('Giỏ hàng trống, không thể tạo đơn hàng.');
@@ -103,10 +111,12 @@ export class OrdersService {
             // Giá ưu tiên: giá riêng của variant nếu có, fallback giá sản phẩm gốc
             const unitPrice = variant.price && Number(variant.price) > 0 ? Number(variant.price) : Number(product.price);
 
-            await tx.productVariant.update({
-              where: { id: variant.id },
-              data: { stock: variant.stock - quantity },
-            });
+            if (shouldDeductStockNow) {
+              await tx.productVariant.update({
+                where: { id: variant.id },
+                data: { stock: variant.stock - quantity },
+              });
+            }
 
             orderItemsData.push({
               productId: item.id,
@@ -127,10 +137,12 @@ export class OrdersService {
 
             const unitPrice = Number(product.price);
 
-            await tx.product.update({
-              where: { id: item.id },
-              data: { stock: product.stock - quantity },
-            });
+            if (shouldDeductStockNow) {
+              await tx.product.update({
+                where: { id: item.id },
+                data: { stock: product.stock - quantity },
+              });
+            }
 
             orderItemsData.push({
               productId: item.id,

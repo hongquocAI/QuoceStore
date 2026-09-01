@@ -14,9 +14,41 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-09-01)*
+*(cập nhật lần cuối: 2026-09-02)*
 
 ### Đang làm / Việc tiếp theo ngay
+
+**✅ "Hướng B" — Tách trừ kho VietQR khỏi lúc tạo đơn, chuyển sang lúc
+webhook xác nhận PAID ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02), người dùng test PASS
+đầu-cuối thật qua ngrok.** Lỗ hổng nghiệp vụ đã sửa: trước đây
+`OrdersService.create()` trừ tồn kho ngay khi tạo đơn cho CẢ COD lẫn
+VietQR — nếu khách tạo đơn VietQR rồi bỏ ngang không quét mã, tồn kho bị
+khóa vĩnh viễn cho 1 đơn không bao giờ thanh toán ("hết hàng ảo"). Thiết kế
+mới: COD giữ nguyên hoàn toàn (đặt đơn = cam kết, trừ kho ngay như cũ).
+VietQR — `OrdersService.create()` vẫn validate tồn kho (throw nếu không đủ)
+nhưng KHÔNG ghi giảm; `PaymentService.handleWebhook()` mới là nơi trừ kho
+thật, đúng lúc xác nhận `PAID` (trong cùng transaction với đổi
+`paymentStatus`), có chốt an toàn `order.paymentStatus !== PAID` chống trừ
+2 lần. Ca hết hàng phát sinh giữa lúc đặt và lúc thanh toán (hiếm) vẫn ghi
+`PAID` (tiền không thể phủ nhận), trừ kho clamp về 0 (không âm), ghi
+`AuditLog` (`action: 'PAYMENT_STOCK_CONFLICT'`) cho Admin xử lý thủ công —
+KHÔNG tự động hoàn tiền/hủy đơn. UI: `checkout/page.tsx` VietQR hiện "Đơn
+hàng đã được ghi nhận — vui lòng quét mã để hoàn tất thanh toán" (icon ⏳),
+không dùng chữ "thành công" cho tới khi PAID thật; `orders/page.tsx` +
+`orders/lookup/page.tsx` hiện rõ "Đang chờ thanh toán" (badge amber) cho
+VietQR PENDING, tách biệt khỏi "Chưa thanh toán" của COD PENDING (bình
+thường, không phải vấn đề). File đã sửa: `backend/src/orders/
+orders.service.ts`, `backend/src/payment/payment.service.ts`,
+`frontend/src/app/checkout/page.tsx`, `frontend/src/app/orders/page.tsx`,
+`frontend/src/app/orders/lookup/page.tsx`, `frontend/src/lib/
+orderLabels.ts` (thêm `getPaymentStatusDisplay()` dùng chung).
+
+**⏳ Tiếp theo (đang làm)**: 2 việc UX liên quan — (A) polling nhẹ ở
+checkout để tự cập nhật "Thanh toán thành công!" không cần rời trang, key
+bằng `Order.id` (UUID) qua endpoint mới `GET /orders/:id/status` (public,
+chỉ trả `paymentStatus`, không PII); (B) `ConfirmModal` dùng chung
+(`components/common/ConfirmModal.tsx`) thay `window.confirm()` ở
+`admin/orders/page.tsx`.
 
 **✅ Nhóm G — ĐẢO NGƯỢC thiết kế + 2 bug ĐÃ ĐÓNG HOÀN TOÀN (2026-09-01).**
 Người dùng xem trực tiếp kết quả Đợt 3 cũ (bo góc mềm, nền `#fafafc`,
@@ -1469,3 +1501,59 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   thật?) bằng công cụ quan sát trực tiếp (ngrok Web Inspector) thay vì đoán
   tiếp — đọc log summary của lỗi (`err.message`) không đủ, phải xem request/
   response THẬT mới lộ ra payload test `orderCode: 123` của PayOS.
+
+### [2026-09-02] Đã hoàn thành: "Hướng B" — Tách trừ kho VietQR khỏi lúc tạo đơn, chuyển sang lúc webhook PAID
+
+- **Bối cảnh**: sau khi webhook đã xác nhận hoạt động đúng (entry
+  `[2026-09-02]` phía trên), người dùng chỉ ra lỗ hổng nghiệp vụ thật:
+  `OrdersService.create()` trừ tồn kho ngay khi tạo đơn cho CẢ COD lẫn
+  VietQR — đơn VietQR bị bỏ ngang không quét mã vẫn giữ khóa tồn kho vĩnh
+  viễn, gây "hết hàng ảo" khi có traffic thật. Yêu cầu vào Plan Mode trước
+  khi động vào (đúng logic tiền/kho).
+- **File đã sửa**:
+  - `backend/src/orders/orders.service.ts` — `create()`: thêm
+    `shouldDeductStockNow = (paymentMethod || 'COD') !== 'BANK_TRANSFER'`,
+    bọc 2 lệnh trừ kho hiện có (`tx.productVariant.update`/
+    `tx.product.update`) trong `if (shouldDeductStockNow)`. Validate tồn
+    kho (throw nếu không đủ) GIỮ NGUYÊN không điều kiện — VietQR vẫn bị
+    chặn tạo đơn nếu hàng đã hết, chỉ khác ở bước ghi giảm.
+  - `backend/src/payment/payment.service.ts` — `handleWebhook()`: đổi câu
+    tìm order thêm `include: { orderItems: true }`; đổi
+    `$transaction([update, create])` (dạng mảng) sang
+    `$transaction(async (tx) => {...})` (callback) để đọc/ghi `stock` có
+    điều kiện trong cùng transaction. Thêm `shouldDeductStock = isSuccess
+    && paymentMethod === 'BANK_TRANSFER' && paymentStatus !== PAID` (chốt
+    cuối chống trừ kho 2 lần nếu webhook xử lý lại đơn đã PAID). Trừ kho
+    clamp `Math.min(available, quantity)` — không bao giờ cho stock âm;
+    item nào thiếu được đẩy vào `stockConflicts[]`. Nếu có conflict, ghi
+    `tx.auditLog.create({ action: 'PAYMENT_STOCK_CONFLICT', entityType:
+    'Order', entityId: order.id, metadata: { orderCode, conflicts } })` —
+    ghi trực tiếp qua Prisma (không qua `@Audit()`/`AuditLogInterceptor`,
+    cơ chế đó gắn với HTTP request có `req.user`, webhook không có).
+    KHÔNG tự động hoàn tiền/hủy đơn.
+  - `frontend/src/app/checkout/page.tsx` — màn `orderResult`: nhánh
+    `paymentMethod === 'BANK_TRANSFER'` đổi icon "⏳" (viền đen, không nền
+    đen) + text "Đơn hàng đã được ghi nhận" / "Vui lòng quét mã để hoàn
+    tất thanh toán", KHÔNG dùng chữ "thành công". COD giữ nguyên y hệt.
+  - `frontend/src/lib/orderLabels.ts` — thêm `getPaymentStatusDisplay(order)`:
+    trả "Đang chờ thanh toán" khi `PENDING + BANK_TRANSFER`, còn lại dùng
+    `PAYMENT_STATUS_LABEL` như cũ (COD PENDING vẫn "Chưa thanh toán" — đúng
+    ngữ nghĩa, không đổi).
+  - `frontend/src/app/orders/page.tsx`,
+    `frontend/src/app/orders/lookup/page.tsx` — `getPaymentStatusBadge()`
+    nhận cả `order` (không chỉ `status`) để thêm nhánh amber
+    (`bg-amber-100 text-amber-800 border-amber-300`) cho `PENDING +
+    BANK_TRANSFER`; badge label đổi sang gọi `getPaymentStatusDisplay(order)`.
+    Mở rộng sang `orders/lookup/page.tsx` theo yêu cầu người dùng (cùng vấn
+    đề UX, tiện sửa đồng thời cho nhất quán).
+- **Đã test**: `npx tsc --noEmit` sạch cả 2 phía. Người dùng tự test
+  đầu-cuối thật qua ngrok: đặt đơn VietQR mới → xác nhận tồn kho CHƯA bị
+  trừ → quét mã thanh toán thật → xác nhận tồn kho MỚI bị trừ đúng lúc này
+  + `/orders` tự hiển thị "Đã thanh toán" khi quay lại trang. **PASS**.
+- **Lưu ý/vấn đề gặp phải**: không có vấn đề kỹ thuật ngoài dự kiến. Điểm
+  quan trọng nhất khi sửa: đổi `$transaction([...])` dạng mảng sang dạng
+  callback trong `handleWebhook()` — 1 lần sửa vội bị mất dòng `const
+  isSuccess = ...` khi edit (Edit tool ghi đè nhầm phần đầu đoạn cũ), lộ ra
+  ngay qua `tsc --noEmit` (4 lỗi `Cannot find name 'isSuccess'`) — bài học:
+  luôn chạy `tsc --noEmit` ngay sau mỗi lần sửa khối code lớn, không dồn
+  nhiều thay đổi rồi mới kiểm tra 1 lần.

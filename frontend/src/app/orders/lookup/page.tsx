@@ -2,12 +2,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { api, getApiErrorMessage } from '@/lib/api';
+import { getPaymentStatusDisplay } from '@/lib/orderLabels';
 
 // ⚡ Nhóm G Đợt B: badge trạng thái vuông đen-trắng/đỏ theo chuẩn Storefront
 // (thay cho tông emerald/gray bo góc của hướng "gia đình Account" đã bỏ).
-function getPaymentStatusBadge(status: string): string {
-  if (status === 'PAID') return 'bg-black text-white';
-  if (status === 'CANCELLED' || status === 'FAILED') return 'bg-red-600 text-white';
+// 🛡️ Hướng B (2026-09-02): thêm nhánh amber riêng cho VietQR PENDING (tiền
+// chưa về, tồn kho chưa trừ) — khớp đúng cách xử lý ở orders/page.tsx.
+function getPaymentStatusBadge(order: { paymentStatus: string; paymentMethod?: string }): string {
+  if (order.paymentStatus === 'PAID') return 'bg-black text-white';
+  if (order.paymentStatus === 'CANCELLED' || order.paymentStatus === 'FAILED') return 'bg-red-600 text-white';
+  if (order.paymentStatus === 'PENDING' && order.paymentMethod === 'BANK_TRANSFER') {
+    return 'bg-amber-100 text-amber-800 border border-amber-300';
+  }
   return 'bg-gray-100 text-gray-700 border border-gray-300';
 }
 
@@ -109,8 +115,8 @@ export default function OrderLookupPage() {
               <span className="text-xs font-bold uppercase tracking-wide text-gray-700">
                 Mã đơn #{order.orderCode}
               </span>
-              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-none ${getPaymentStatusBadge(order.paymentStatus)}`}>
-                {order.paymentStatus}
+              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-none ${getPaymentStatusBadge(order)}`}>
+                {getPaymentStatusDisplay(order)}
               </span>
             </div>
 

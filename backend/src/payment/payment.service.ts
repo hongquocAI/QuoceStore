@@ -130,7 +130,10 @@ export class PaymentService {
       return { success: true, message: 'Giao dịch đã được xử lý trước đó (Idempotent)' };
     }
 
-    const order = await this.prisma.order.findUnique({ where: { orderCode } });
+    const order = await this.prisma.order.findUnique({
+      where: { orderCode },
+      include: { orderItems: true },
+    });
     if (!order) {
       // 🛡️ FIX (phát hiện 2026-09-02 khi test payos.webhooks.confirm() qua
       // ngrok): trước đây throw NotFoundException (404) ở đây — nhưng
@@ -168,14 +171,64 @@ export class PaymentService {
 
     const isSuccess = verifiedData.code === '00' && amountMatches;
 
-    await this.prisma.$transaction([
-      this.prisma.order.update({
+    // 🛡️ Hướng B (2026-09-02): trừ tồn kho VietQR ĐÚNG LÚC NÀY (webhook xác
+    // nhận PAID thật), không phải lúc tạo đơn — xem OrdersService.create().
+    // `order.paymentStatus !== PAID` là chốt an toàn chống trừ kho 2 lần nếu
+    // webhook xử lý lại 1 đơn đã PAID (transactionId khác nhưng cùng đơn).
+    const shouldDeductStock =
+      isSuccess && order.paymentMethod === 'BANK_TRANSFER' && order.paymentStatus !== PaymentStatus.PAID;
+
+    await this.prisma.$transaction(async (tx) => {
+      const stockConflicts: Array<{ label: string; requested: number; available: number }> = [];
+
+      if (shouldDeductStock) {
+        for (const item of order.orderItems) {
+          if (item.variantId) {
+            const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
+            const available = variant?.stock ?? 0;
+            const decrementBy = Math.min(available, item.quantity);
+            if (decrementBy < item.quantity) {
+              stockConflicts.push({
+                label: item.variantColorName ?? item.productId,
+                requested: item.quantity,
+                available,
+              });
+            }
+            if (variant && decrementBy > 0) {
+              await tx.productVariant.update({
+                where: { id: item.variantId },
+                data: { stock: { decrement: decrementBy } },
+              });
+            }
+          } else {
+            const product = await tx.product.findUnique({ where: { id: item.productId } });
+            const available = product?.stock ?? 0;
+            const decrementBy = Math.min(available, item.quantity);
+            if (decrementBy < item.quantity) {
+              stockConflicts.push({
+                label: product?.title ?? item.productId,
+                requested: item.quantity,
+                available,
+              });
+            }
+            if (product && decrementBy > 0) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: { stock: { decrement: decrementBy } },
+              });
+            }
+          }
+        }
+      }
+
+      await tx.order.update({
         where: { id: order.id },
         data: {
           paymentStatus: isSuccess ? PaymentStatus.PAID : PaymentStatus.FAILED,
         },
-      }),
-      this.prisma.paymentTransaction.create({
+      });
+
+      await tx.paymentTransaction.create({
         data: {
           orderId: order.id,
           transactionId,
@@ -184,8 +237,30 @@ export class PaymentService {
           status: isSuccess ? 'SUCCESS' : 'AMOUNT_MISMATCH_OR_FAILED',
           webhookPayload: JSON.parse(JSON.stringify(webhookBody)),
         },
-      }),
-    ]);
+      });
+
+      // ⚡ Ca hết hàng phát sinh GIỮA lúc đặt và lúc thanh toán (hiếm nhưng
+      // có thể xảy ra): tiền đã về nên VẪN ghi PAID (không thể phủ nhận
+      // giao dịch thật), KHÔNG tự động hoàn tiền/hủy đơn (quyết định kinh
+      // doanh cần con người) — chỉ gắn cờ cảnh báo qua AuditLog để Admin xử
+      // lý thủ công. Ghi trực tiếp qua Prisma (không qua @Audit()/
+      // AuditLogInterceptor — cơ chế đó gắn với HTTP request có req.user,
+      // không áp dụng được cho webhook server-to-server không có user).
+      if (stockConflicts.length > 0) {
+        this.logger.error(
+          `⚠️ HẾT HÀNG khi xác nhận thanh toán: order ${order.id} (mã ${orderCode}) có item vượt tồn kho. Cần Admin xử lý thủ công.`,
+        );
+        await tx.auditLog.create({
+          data: {
+            userId: null,
+            action: 'PAYMENT_STOCK_CONFLICT',
+            entityType: 'Order',
+            entityId: order.id,
+            metadata: { orderCode: order.orderCode, conflicts: stockConflicts },
+          },
+        });
+      }
+    });
 
     return {
       success: true,
