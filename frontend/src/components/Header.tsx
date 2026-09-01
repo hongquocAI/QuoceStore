@@ -8,6 +8,10 @@ export default function Header() {
   const { cart } = useCart();
   const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // ⚡ Đợt 4 Nhóm G (2026-09-02): nav chính (Cửa hàng/Phụ kiện/Tra cứu đơn)
+  // trước đây `hidden md:flex` khiến mobile mất hoàn toàn — giỏ hàng +
+  // dropdown tài khoản vẫn hiện, chỉ nav chính bị ẩn không có cách nào bấm.
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -34,7 +38,17 @@ export default function Header() {
 
         {/* GIỎ HÀNG & TÀI KHOẢN */}
         <div className="flex items-center gap-6">
-          
+
+          {/* HAMBURGER — chỉ hiện trên mobile, toggle panel nav bên dưới */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            aria-label={mobileMenuOpen ? 'Đóng menu' : 'Mở menu'}
+            className="md:hidden text-[#111] w-8 h-8 flex items-center justify-center"
+          >
+            <span className="text-xl font-black">{mobileMenuOpen ? '✕' : '☰'}</span>
+          </button>
+
           <Link href="/cart" className="text-xs font-bold uppercase tracking-wider text-[#111] hover:text-gray-500 transition flex items-center gap-1.5 antialiased">
             <span>Giỏ hàng</span>
             <span className="bg-black text-white text-[10px] w-5 h-5 rounded-none flex items-center justify-center font-black">
@@ -136,6 +150,18 @@ export default function Header() {
         </div>
 
       </div>
+
+      {/* PANEL NAV MOBILE — chứa đúng link đang có trong <nav> desktop, đóng
+          menu khi bấm 1 link */}
+      {mobileMenuOpen && (
+        <nav className="md:hidden border-t border-gray-200 px-6 py-4 flex flex-col gap-4 text-xs font-bold uppercase tracking-widest text-[#111] antialiased">
+          <Link href="/" className="hover:text-gray-500 transition" onClick={() => setMobileMenuOpen(false)}>Cửa hàng</Link>
+          <Link href="/accessories" className="hover:text-gray-500 transition" onClick={() => setMobileMenuOpen(false)}>Phụ kiện</Link>
+          {!user && (
+            <Link href="/orders/lookup" className="hover:text-gray-500 transition" onClick={() => setMobileMenuOpen(false)}>Tra cứu đơn</Link>
+          )}
+        </nav>
+      )}
     </header>
   );
 }
