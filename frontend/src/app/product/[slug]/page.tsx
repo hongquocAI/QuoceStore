@@ -4,6 +4,7 @@ import { ENV } from '@/config/env';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
+import ProductCard from '@/components/common/ProductCard';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -33,6 +34,9 @@ export default function ProductDetailPage({ params }: PageProps) {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
   const [addedMessage, setAddedMessage] = useState(false);
+  // ⚡ Đợt 4 Nhóm G: sản phẩm liên quan (cùng SubCategory) — dùng lại đúng
+  // endpoint phân trang có sẵn từ Nhóm B, không cần API mới.
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
   // Trạng thái đóng/mở các mục Accordion
   const [openSection, setOpenSection] = useState<string | null>('desc');
@@ -69,6 +73,29 @@ export default function ProductDetailPage({ params }: PageProps) {
 
     fetchProductDetail();
   }, [slug]);
+
+  // ⚡ Đợt 4 Nhóm G: tải sản phẩm liên quan SAU khi có product (cần biết
+  // subCategoryId). Lọc bỏ chính sản phẩm đang xem, giữ tối đa 4. Nếu
+  // không có kết quả, KHÔNG fallback sang categoryId — ẩn hẳn section
+  // thay vì hiện khối trống (giữ đơn giản, đúng phạm vi đã chốt).
+  useEffect(() => {
+    if (!product?.subCategoryId) {
+      setRelatedProducts([]);
+      return;
+    }
+    const fetchRelated = async () => {
+      try {
+        const res = await fetch(`${ENV.apiUrl}/products?subCategoryId=${product.subCategoryId}&limit=5`);
+        const result = await res.json();
+        const items: Product[] = Array.isArray(result?.items) ? result.items : [];
+        setRelatedProducts(items.filter((p) => p.id !== product.id).slice(0, 4));
+      } catch (err) {
+        console.error('Lỗi tải sản phẩm liên quan:', err);
+        setRelatedProducts([]);
+      }
+    };
+    fetchRelated();
+  }, [product?.subCategoryId, product?.id]);
 
   const handleVariantChange = (variant: any) => {
     setSelectedVariant(variant);
@@ -339,6 +366,21 @@ export default function ProductDetailPage({ params }: PageProps) {
 
         </div>
       </div>
+
+      {/* ⚡ Đợt 4 Nhóm G: sản phẩm liên quan (cùng SubCategory) — ẩn hẳn
+          section nếu không có kết quả, không hiện khối trống. */}
+      {relatedProducts.length > 0 && (
+        <div className="max-w-[1400px] mx-auto px-6 pt-16 pb-8 border-t border-gray-200 mt-16">
+          <h2 className="text-xl md:text-2xl font-black uppercase tracking-wider text-[#111] mb-8">
+            Sản phẩm liên quan
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {relatedProducts.map((item) => (
+              <ProductCard key={item.id} product={item} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
