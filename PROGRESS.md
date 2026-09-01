@@ -18,6 +18,20 @@
 
 ### Đang làm / Việc tiếp theo ngay
 
+**✅ G2 — Dynamic list Highlights/Specs (Admin Products) ĐÃ ĐÓNG HOÀN TOÀN
+(2026-09-02, làm tự động qua đêm).** Thay 2 textarea thô (`highlightsText`,
+`specsText` JSON tay) bằng dynamic list `highlights: string[]` +
+`specs: {key,value}[]`, đúng mô tả G2 đã ghi sẵn trong CLAUDE.md. Backend
+KHÔNG cần đổi (đã tương thích). `tsc --noEmit` + `npm run build` sạch.
+Chi tiết đầy đủ xem Nhật ký chi tiết.
+
+**🔍 Cần người dùng kiểm tra bằng mắt (G2, chưa test UI thật)**: vào
+`/admin/products`, mở Thêm/Sửa sản phẩm, xác nhận UI Highlights/Specs mới
+hoạt động đúng (thêm/xóa hàng, giá trị cũ của sản phẩm đã có specs/
+highlights hiển thị lại đúng khi mở Sửa), lưu thử 1 sản phẩm và xác nhận
+trang chi tiết sản phẩm (`/product/[slug]`) vẫn hiển thị specs/highlights
+đúng như trước (không đổi cách backend lưu/trả dữ liệu, chỉ đổi UI nhập).
+
 **✅ Nhóm D — Pháp lý & Tuân thủ ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02, làm tự động
 qua đêm, chưa có người dùng test UI thật).** 3 trang mới `/privacy-policy`,
 `/terms`, `/return-policy` — nội dung đầy đủ, nghiêm túc theo đúng khung
@@ -1826,3 +1840,54 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   dùng kiểm tra" phần Trạng thái hiện tại (nội dung câu chữ, vị trí Footer
   bằng mắt, domain liên hệ `support@quoce.vn`) — không có mục nào bị
   BLOCK/dừng giữa đường, toàn bộ Nhóm D đã hoàn thành và commit.
+
+### [2026-09-02] Đã hoàn thành: G2 — Dynamic list Highlights/Specs (Admin Products, làm tự động qua đêm)
+
+- **Bối cảnh**: người dùng chỉ định làm G2 trước (mô tả chi tiết đã có sẵn
+  trong CLAUDE.md từ trước, không cần hỏi lại). Đọc lại code thật trước
+  khi sửa: `formData.highlightsText`/`formData.specsText` (2 textarea, 1
+  JSON tay + 1 mỗi-dòng-1-ý), `specsError` (`useMemo` validate JSON),
+  logic parse trong `handleSubmit` (dòng ~605-617 cũ), map dữ liệu lúc mở
+  Thêm mới (`handleOpenAdd`) và Sửa (`handleOpenEdit`).
+- **File đã sửa**: `frontend/src/app/admin/products/page.tsx` (không đụng
+  file nào khác, không đụng backend):
+  - `formData`: `highlightsText: string` → `highlights: string[]`;
+    `specsText: string` → `specs: {key: string; value: string}[]`.
+  - Xóa `specsError` (`useMemo`) — không còn JSON thô để validate; xóa
+    `useMemo` khỏi import React (không còn dùng ở đâu trong file).
+  - Thêm 6 handler mới theo đúng pattern functional-updater trên `prev`
+    (tránh stale closure, đúng bài học đã ghi trong CLAUDE.md về bug mất
+    ảnh variant trước đây): `handleAddHighlight`/`handleHighlightChange`/
+    `handleRemoveHighlight`, `handleAddSpec`/`handleSpecChange`/
+    `handleRemoveSpec`.
+  - `handleOpenAdd`: default data đổi từ chuỗi bullet/JSON mẫu sang mảng/
+    danh sách key-value mẫu tương ứng (giữ đúng nội dung demo cũ, chỉ đổi
+    kiểu dữ liệu).
+  - `handleOpenEdit`: map `product.highlights` (mảng có sẵn) trực tiếp
+    thay vì `.join('\n')`; map `product.specs` (object) qua
+    `Object.entries()` thành mảng `{key,value}` thay vì
+    `JSON.stringify()`.
+  - `handleSubmit`: bỏ `JSON.parse(formData.specsText)` (từng có thể throw
+    lỗi JSON) — thay bằng vòng `for` ghép `formData.specs` thành object,
+    bỏ qua hàng có `key` rỗng; `highlightsArray` ghép trực tiếp từ mảng
+    thay vì `.split('\n')`.
+  - JSX: 2 textarea → 2 khối dynamic list (mỗi hàng 1 input + nút "Xóa",
+    nút "+ Thêm điểm nhấn"/"+ Thêm thuộc tính" ở đầu khối) — tái dùng
+    ĐÚNG style đã có sẵn trong chính file này cho "QUẢN LÝ BIẾN THỂ MÀU
+    SẮC" (nút thêm `bg-black text-white`, nút xóa
+    `text-red-600 bg-red-50 border-red-200`), không phát minh style mới.
+- **Verify tương thích backend (không sửa gì, chỉ đọc để xác nhận)**:
+  `backend/src/product/dto/create-product.dto.ts` — `specs?: Record<string,
+  any>` với `@IsObject()` (không ép kiểu value cụ thể), `highlights?:
+  string[]` với `@IsString({ each: true })` — cả 2 đã tương thích sẵn với
+  payload mới (`Record<string,string>` cho specs, `string[]` cho
+  highlights).
+- **Đã test (tự động hóa được)**: `npx tsc --noEmit` sạch. `npm run build`
+  (production) — thành công, không lỗi, `/admin/products` compile OK.
+- **KHÔNG làm**: không đụng backend (không cần), không thêm validate
+  duplicate-key giữa các hàng specs (ngoài phạm vi mô tả G2 gốc, tránh
+  scope creep).
+- **Lưu ý/vấn đề gặp phải**: không có vấn đề ngoài dự kiến. Việc còn lại
+  (test UI thật — thêm/xóa hàng, mở Sửa sản phẩm có specs/highlights có
+  sẵn) đã ghi vào mục "🔍 Cần người dùng kiểm tra" ở Trạng thái hiện tại,
+  không block gì tiếp.

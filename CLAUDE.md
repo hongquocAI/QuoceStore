@@ -458,21 +458,15 @@ thẳng vào sửa dù đã biết rõ vấn đề ở G2):**
 - Trình bày kết quả audit dưới dạng bảng cho người dùng xem trước khi quyết
   định thứ tự sửa.
 
-**G2 — 2 ô nhập liệu thô trong form Thêm/Sửa sản phẩm Admin
-(`admin/products/page.tsx`) — ĐÃ XÁC ĐỊNH RÕ, ưu tiên cao trong Nhóm G:**
-- "Thông số kỹ thuật (Specs - JSON Format)": hiện là textarea JSON thô, bắt
-  Admin (không biết lập trình) tự gõ đúng cú pháp `{}"":,` — rất không
-  thân thiện. Thay bằng trình xây dựng key-value động: danh sách hàng [Tên
-  thuộc tính] [Giá trị] [nút Xóa] + nút "+ Thêm thuộc tính" ở cuối. Hệ
-  thống tự ghép thành đúng JSON lúc submit, Admin không bao giờ thấy/chạm
-  cú pháp JSON. Vẫn giữ tính linh hoạt (mỗi loại sản phẩm thuộc tính khác
-  nhau, không có schema cố định).
-- "Điểm nhấn sản phẩm (Highlights - Mỗi dòng 1 ý)": hiện là textarea nhiều
-  dòng, mỗi dòng = 1 highlight. Đỡ thô hơn Specs (không cần biết cú pháp
-  gì), nhưng nên cân nhắc nâng cấp đồng bộ thành dynamic list input (mỗi
-  highlight 1 ô input riêng + nút thêm/xóa từng dòng, cùng pattern với
-  Specs) — để nhất quán trải nghiệm giữa 2 trường "nhập nhiều mục" trong
-  cùng 1 form, thay vì 1 cái textarea thô 1 cái list UI đẹp.
+**G2 — ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02, làm tự động qua đêm)**: 2 ô nhập
+liệu thô trong form Thêm/Sửa sản phẩm Admin (`admin/products/page.tsx`) đã
+thay bằng trình xây dựng key-value/list động — Admin không còn thấy/chạm
+cú pháp JSON. `formData.specsText` (string JSON) → `formData.specs:
+{key,value}[]`; `formData.highlightsText` (textarea nhiều dòng) →
+`formData.highlights: string[]`. Ghép thành object/mảng đúng lúc submit.
+Backend KHÔNG cần đổi (`specs?: Record<string, any>` với `@IsObject()` đã
+tương thích sẵn với giá trị string). `tsc --noEmit` + `npm run build` sạch.
+Chi tiết đầy đủ xem PROGRESS.md.
 
 **G3 — Sau khi G1 (audit) hoàn tất**, bàn với người dùng để chốt danh sách
 ưu tiên sửa cụ thể cho từng trang/component — KHÔNG tự ý sửa hàng loạt khi

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { Paginated } from '@/types';
 
@@ -153,25 +153,16 @@ export default function AdminProductsPage() {
     images: [] as string[],
     isActive: true,
     variants: [] as Variant[],
-    highlightsText: '',
-    specsText: '{\n  "material": "Aluminum Alloy",\n  "input": "Type-C 65W",\n  "output": "Dual Type-C + USB-A"\n}',
+    // 🛡️ G2 (2026-09-02): thay 2 textarea thô (JSON tay + mỗi dòng 1 ý)
+    // bằng danh sách key-value/list động — Admin không bao giờ chạm cú
+    // pháp JSON. Ghép thành object/mảng ĐÚNG lúc submit (handleSubmit).
+    highlights: [] as string[],
+    specs: [] as { key: string; value: string }[],
   });
 
   // ⚡ MỚI: SubCategory hiển thị trong dropdown phải lọc theo Category đang
   // chọn — đây chính là "dropdown phụ thuộc" đúng tinh thần MDM.
   const filteredSubCategories = subCategories.filter((sc) => sc.categoryId === formData.categoryId);
-
-  // ⚡ UX form Admin (mục 2b): validate JSON specsText NGAY KHI GÕ, không đợi
-  // tới lúc Submit mới báo lỗi. handleSubmit vẫn giữ nguyên try/catch JSON.parse
-  // làm lớp chặn cuối cùng (phòng khi giá trị này chưa kịp cập nhật).
-  const specsError = useMemo(() => {
-    try {
-      JSON.parse(formData.specsText || '{}');
-      return null;
-    } catch (e: any) {
-      return e.message as string;
-    }
-  }, [formData.specsText]);
 
   useEffect(() => {
     fetchInitialData();
@@ -532,6 +523,45 @@ export default function AdminProductsPage() {
     }));
   };
 
+  // ⚡ G2: dynamic list cho Highlights — mỗi ý 1 ô input riêng, thay
+  // textarea nhiều dòng. Dùng functional updater trên `prev` (đúng bài
+  // học stale-closure ở variant image upload trước đây), không đọc
+  // formData ngoài closure.
+  const handleAddHighlight = () => {
+    setFormData(prev => ({ ...prev, highlights: [...prev.highlights, ''] }));
+  };
+  const handleHighlightChange = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      highlights: prev.highlights.map((h, i) => (i === index ? value : h)),
+    }));
+  };
+  const handleRemoveHighlight = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      highlights: prev.highlights.filter((_, i) => i !== index),
+    }));
+  };
+
+  // ⚡ G2: dynamic list cho Specs — thay textarea JSON thô bằng danh sách
+  // hàng [Tên thuộc tính] [Giá trị]. Ghép thành object ĐÚNG lúc submit
+  // (handleSubmit) — Admin không bao giờ thấy/chạm cú pháp JSON.
+  const handleAddSpec = () => {
+    setFormData(prev => ({ ...prev, specs: [...prev.specs, { key: '', value: '' }] }));
+  };
+  const handleSpecChange = (index: number, field: 'key' | 'value', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      specs: prev.specs.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
+    }));
+  };
+  const handleRemoveSpec = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      specs: prev.specs.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleOpenCreate = () => {
     setIsEditing(false);
     setCurrentId(null);
@@ -553,8 +583,12 @@ export default function AdminProductsPage() {
         { colorCode: 'black', colorName: 'Đen nhám', hexCode: '#111111', price: 0, stock: 25, images: [] },
         { colorCode: 'white', colorName: 'Trắng sứ', hexCode: '#FFFFFF', price: 0, stock: 25, images: [] }
       ] as Variant[],
-      highlightsText: '• Công nghệ sạc nhanh PD 65W\n• Dung lượng thực tế 20000mAh\n• Màn hình LED hiển thị % pin',
-      specsText: '{\n  "material": "Aluminum Alloy",\n  "input": "Type-C 65W",\n  "output": "Dual Type-C + USB-A"\n}',
+      highlights: ['Công nghệ sạc nhanh PD 65W', 'Dung lượng thực tế 20000mAh', 'Màn hình LED hiển thị % pin'],
+      specs: [
+        { key: 'material', value: 'Aluminum Alloy' },
+        { key: 'input', value: 'Type-C 65W' },
+        { key: 'output', value: 'Dual Type-C + USB-A' },
+      ],
     };
     setFormData(initial);
     setInitialFormDataSnapshot(JSON.stringify(initial)); // ⚡ UX (mục 2b): snapshot cho cảnh báo đóng modal chưa lưu
@@ -579,8 +613,10 @@ export default function AdminProductsPage() {
       images: product.images || [],
       isActive: product.isActive,
       variants: product.variants || [],
-      highlightsText: Array.isArray(product.highlights) ? product.highlights.join('\n') : '',
-      specsText: product.specs ? JSON.stringify(product.specs, null, 2) : '{}',
+      highlights: Array.isArray(product.highlights) ? product.highlights : [],
+      specs: product.specs
+        ? Object.entries(product.specs).map(([key, value]) => ({ key, value: String(value) }))
+        : [],
     };
     setFormData(initial);
     setInitialFormDataSnapshot(JSON.stringify(initial)); // ⚡ UX (mục 2b): snapshot cho cảnh báo đóng modal chưa lưu
@@ -603,17 +639,14 @@ export default function AdminProductsPage() {
     setSubmitting(true); // ⚡ UX (mục 2b): khóa nút Submit, tránh double-submit
 
     try {
-      // Parse highlights từ textarea (mỗi dòng là một phần tử mảng)
-      const highlightsArray = formData.highlightsText
-        ? formData.highlightsText.split('\n').map(item => item.trim()).filter(Boolean)
-        : [];
+      // ⚡ G2: ghép highlights/specs từ dynamic list ĐÚNG lúc submit — Admin
+      // chỉ thao tác trên input/button, không bao giờ chạm cú pháp JSON.
+      const highlightsArray = formData.highlights.map(item => item.trim()).filter(Boolean);
 
-      // Parse specs từ chuỗi JSON an toàn
-      let parsedSpecs = {};
-      try {
-        parsedSpecs = formData.specsText ? JSON.parse(formData.specsText) : {};
-      } catch (err) {
-        throw new Error('Định dạng JSON trong thông số kỹ thuật (Specs) không hợp lệ.');
+      const parsedSpecs: Record<string, string> = {};
+      for (const { key, value } of formData.specs) {
+        const trimmedKey = key.trim();
+        if (trimmedKey) parsedSpecs[trimmedKey] = value;
       }
 
       // 🛡️ FIX BUG 400 "variants.0.property id should not exist":
@@ -1189,35 +1222,85 @@ export default function AdminProductsPage() {
                   />
                 </div>
 
-                {/* ⚡ Bổ sung trường cấu hình Highlights & Specs để không bị trống trang chi tiết */}
+                {/* ⚡ G2 (2026-09-02): Highlights & Specs — trình xây dựng key-value/
+                    list động, thay 2 textarea thô. Admin không bao giờ thấy/chạm
+                    cú pháp JSON, vẫn giữ tính linh hoạt (mỗi sản phẩm thuộc tính
+                    khác nhau, không schema cố định). */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-200 pt-4">
                   <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Điểm nhấn sản phẩm (Highlights - Mỗi dòng 1 ý)</label>
-                    <textarea
-                      name="highlightsText"
-                      rows={4}
-                      value={formData.highlightsText}
-                      onChange={handleChange}
-                      placeholder="• Công nghệ sạc nhanh PD 65W&#10;• Dung lượng 20000mAh"
-                      className="bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3 rounded-none focus:outline-none focus:border-black font-sans"
-                    />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Điểm nhấn sản phẩm (Highlights)</label>
+                      <button
+                        type="button"
+                        onClick={handleAddHighlight}
+                        className="bg-black text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 hover:bg-gray-800 transition"
+                      >
+                        + Thêm điểm nhấn
+                      </button>
+                    </div>
+                    {formData.highlights.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">Chưa có điểm nhấn nào.</p>
+                    ) : (
+                      formData.highlights.map((highlight, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={highlight}
+                            onChange={(e) => handleHighlightChange(index, e.target.value)}
+                            placeholder="VD: Công nghệ sạc nhanh PD 65W"
+                            className="flex-1 bg-white border border-gray-300 text-black text-xs font-medium px-3 py-2.5 rounded-none focus:outline-none focus:border-black font-sans"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveHighlight(index)}
+                            className="text-red-600 font-bold text-[10px] uppercase px-2 py-1 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white transition flex-shrink-0"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Thông số kỹ thuật (Specs - JSON Format)</label>
-                    <textarea
-                      name="specsText"
-                      rows={4}
-                      value={formData.specsText}
-                      onChange={handleChange}
-                      placeholder='{"material": "Aluminum", "weight": "340g"}'
-                      aria-invalid={!!specsError}
-                      className={`bg-white border text-black font-mono text-xs px-4 py-3 rounded-none focus:outline-none ${
-                        specsError ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-black'
-                      }`}
-                    />
-                    {specsError && (
-                      <p className="text-red-600 text-[10px] font-bold">⚠ JSON không hợp lệ: {specsError}</p>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Thông số kỹ thuật (Specs)</label>
+                      <button
+                        type="button"
+                        onClick={handleAddSpec}
+                        className="bg-black text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 hover:bg-gray-800 transition"
+                      >
+                        + Thêm thuộc tính
+                      </button>
+                    </div>
+                    {formData.specs.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">Chưa có thông số nào.</p>
+                    ) : (
+                      formData.specs.map((spec, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={spec.key}
+                            onChange={(e) => handleSpecChange(index, 'key', e.target.value)}
+                            placeholder="Tên thuộc tính (VD: Chất liệu)"
+                            className="w-2/5 bg-white border border-gray-300 text-black text-xs font-medium px-3 py-2.5 rounded-none focus:outline-none focus:border-black font-sans"
+                          />
+                          <input
+                            type="text"
+                            value={spec.value}
+                            onChange={(e) => handleSpecChange(index, 'value', e.target.value)}
+                            placeholder="Giá trị (VD: Nhôm nguyên khối)"
+                            className="flex-1 bg-white border border-gray-300 text-black text-xs font-medium px-3 py-2.5 rounded-none focus:outline-none focus:border-black font-sans"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSpec(index)}
+                            className="text-red-600 font-bold text-[10px] uppercase px-2 py-1 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white transition flex-shrink-0"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>
