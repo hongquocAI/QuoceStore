@@ -7,6 +7,7 @@ import {
   getPaymentStatusDisplay,
   SHIPPING_STATUS_LABEL,
   SHIPPING_STATUS_BADGE,
+  SHIPPING_STATUS_ORDER,
   PAYMENT_METHOD_LABEL,
 } from '@/lib/orderLabels';
 import { ShippingStatus } from '@/types';
@@ -192,6 +193,42 @@ export default function OrdersHistoryPage() {
               </div>
 
               <div className="p-6 space-y-6">
+                {/* ⚡ Đợt 4 Nhóm G: timeline trực quan trạng thái giao hàng —
+                    CANCELLED không nằm trong luồng tuyến tính, hiện cảnh báo
+                    riêng thay vì stepper. */}
+                {detailOrder.shippingStatus === 'CANCELLED' ? (
+                  <p className="text-xs font-bold uppercase tracking-wide text-red-600 bg-red-50 border border-red-200 rounded-none p-3">
+                    Đơn hàng đã bị hủy
+                  </p>
+                ) : (
+                  <div className="flex items-center">
+                    {SHIPPING_STATUS_ORDER.map((step, idx) => {
+                      const currentIdx = SHIPPING_STATUS_ORDER.indexOf(detailOrder.shippingStatus as ShippingStatus);
+                      const isDone = idx <= currentIdx;
+                      const isCurrent = idx === currentIdx;
+                      return (
+                        <div key={step} className="flex items-center flex-1 last:flex-none">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div
+                              className={`w-6 h-6 flex items-center justify-center text-[10px] font-black border-2 rounded-none ${
+                                isDone ? 'bg-black text-white border-black' : 'bg-white text-gray-300 border-gray-300'
+                              } ${isCurrent ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+                            >
+                              {idx + 1}
+                            </div>
+                            <span className={`text-[9px] font-bold uppercase tracking-wide text-center whitespace-nowrap ${isDone ? 'text-gray-900' : 'text-gray-300'}`}>
+                              {SHIPPING_STATUS_LABEL[step]}
+                            </span>
+                          </div>
+                          {idx < SHIPPING_STATUS_ORDER.length - 1 && (
+                            <div className={`flex-1 h-0.5 mx-1 mb-4 ${idx < currentIdx ? 'bg-black' : 'bg-gray-200'}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`text-[10px] px-3 py-1.5 rounded-none uppercase font-black tracking-widest ${getPaymentStatusBadge(detailOrder)}`}>
                     {getPaymentStatusDisplay(detailOrder)}

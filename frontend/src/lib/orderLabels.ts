@@ -29,6 +29,11 @@ export const SHIPPING_STATUS_BADGE: Record<string, string> = {
   CANCELLED: 'bg-red-100 text-red-800',
 };
 
+// ⚡ Đợt 4 Nhóm G (2026-09-02): thứ tự chuẩn cho stepper trực quan trạng
+// thái giao hàng. CANCELLED KHÔNG nằm trong luồng tuyến tính — chỗ gọi
+// phải tự kiểm tra riêng (nếu CANCELLED, hiện cảnh báo thay vì stepper).
+export const SHIPPING_STATUS_ORDER: ShippingStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
+
 // ⚡ G4 (2026-09-02): dùng cho modal chi tiết orders/page.tsx +
 // orders/lookup/page.tsx. KHÔNG đổi checkout/page.tsx (đang dùng ternary
 // inline y hệt nội dung) — tránh đụng lại file vừa test luồng tiền thật.
