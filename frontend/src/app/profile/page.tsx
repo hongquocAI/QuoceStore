@@ -108,7 +108,7 @@ export default function ProfilePage() {
         // ⚡ Gọi updateUser để cập nhật ngay lập tức vào AuthContext và Header
         updateUser({ avatarUrl: imageUrl });
       } catch (err: any) {
-        setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể tải ảnh lên server.' });
+        setMessage({ type: 'error', text: getApiErrorMessage(err, 'Không thể tải ảnh lên server.') });
       } finally {
         setUploadingImage(false);
       }
@@ -171,51 +171,54 @@ export default function ProfilePage() {
 
   if (authLoading) {
     return (
-      <div className="flex justify-center items-center h-[70vh] bg-[#fafafc] text-gray-900">
-        <span className="text-sm text-gray-500 animate-pulse">Đang tải thông tin...</span>
+      <div className="flex justify-center items-center h-[70vh] bg-white text-[#111]">
+        <span className="tracking-[0.3em] text-xs uppercase font-bold antialiased animate-pulse">ĐANG TẢI THÔNG TIN...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafc] text-gray-900 pb-28 pt-10">
+    <div className="min-h-screen bg-white text-[#111] font-sans antialiased pb-28">
 
-      <div className="max-w-4xl mx-auto px-6">
-        <h1 className="text-3xl md:text-4xl font-serif mb-8 tracking-tight">
+      <div className="max-w-4xl mx-auto px-6 pt-12 pb-8 border-b border-gray-200">
+        <h1 className="text-2xl md:text-4xl font-black uppercase tracking-[0.2em] text-[#111]">
           Thông tin tài khoản
         </h1>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-6 pt-8">
 
         {message.text && (
-          <div className={`mb-8 text-xs font-medium p-2.5 rounded-xl text-center ${
+          <div className={`mb-8 p-3 text-[11px] font-bold uppercase tracking-wider text-center whitespace-pre-line rounded-none border ${
             message.type === 'success'
-              ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-              : 'bg-red-50 border border-red-200 text-red-600'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-red-50 border-red-200 text-red-600'
           }`}>
             {message.text}
           </div>
         )}
 
-        <form onSubmit={handleUpdateProfile} className="flex flex-col gap-6">
+        <form onSubmit={handleUpdateProfile} className="flex flex-col gap-8">
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white border border-gray-200 rounded-none p-6">
 
             <div className="flex flex-col gap-3">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Ảnh đại diện</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Ảnh đại diện</label>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center font-semibold text-lg overflow-hidden flex-shrink-0">
+                <div className="w-16 h-16 bg-black text-white rounded-none flex items-center justify-center font-black text-lg overflow-hidden flex-shrink-0 border border-black">
                   {formData.avatarUrl ? (
                     <img
                       src={getFullImageUrl(formData.avatarUrl)}
                       alt="Avatar"
-                      className="w-full h-full object-cover rounded-full"
+                      className="w-full h-full object-cover rounded-none"
                     />
                   ) : (
                     <span>{formData.fullName ? formData.fullName.charAt(0).toUpperCase() : 'U'}</span>
                   )}
                 </div>
                 <div className="flex-1 flex flex-col gap-2">
-                  <label className="cursor-pointer bg-gray-900 text-white text-xs uppercase tracking-wider font-medium px-4 py-2.5 rounded-2xl text-center hover:bg-black transition">
-                    {uploadingImage ? 'Đang xử lý...' : 'Chọn ảnh từ máy'}
+                  <label className="cursor-pointer bg-black text-white text-[11px] uppercase tracking-widest font-bold px-4 py-3 rounded-none text-center hover:bg-gray-800 transition">
+                    {uploadingImage ? 'ĐANG XỬ LÝ...' : 'CHỌN ẢNH TỪ MÁY'}
                     <input
                       type="file"
                       accept="image/*"
@@ -223,78 +226,78 @@ export default function ProfilePage() {
                       className="hidden"
                     />
                   </label>
-                  <span className="text-[11px] text-gray-400">Hỗ trợ định dạng JPG, PNG</span>
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Hỗ trợ JPG, PNG</span>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col gap-3">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Điểm thành viên QUOCÉ Club</label>
-              <div className="bg-[#fafafc] rounded-2xl px-4 py-3.5 flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-900">Hạng thành viên</span>
-                <span className="text-xs font-semibold uppercase tracking-wider bg-black text-white px-3 py-1 rounded-full">
-                  {user?.loyaltyPoints || 0} điểm ⚡
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Điểm thành viên QUOCÉ Club</label>
+              <div className="border border-gray-200 rounded-none px-4 py-3.5 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-900">Hạng thành viên</span>
+                <span className="text-[10px] font-black uppercase tracking-widest bg-black text-white px-3 py-1.5 rounded-none">
+                  {user?.loyaltyPoints || 0} ĐIỂM
                 </span>
               </div>
             </div>
 
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white border border-gray-200 rounded-none p-6">
 
             <div className="flex flex-col gap-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Email đăng nhập</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Email đăng nhập</label>
               <input
                 type="email"
                 disabled
                 value={user?.email || ''}
-                className="w-full bg-gray-100 border border-gray-200 text-gray-500 text-sm px-4 py-3 rounded-2xl cursor-not-allowed"
+                className="w-full bg-gray-100 border border-gray-200 text-gray-500 text-xs font-medium px-4 py-3.5 rounded-none cursor-not-allowed"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Họ và tên</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Họ và tên</label>
               <input
                 type="text"
                 name="fullName"
                 required
                 value={formData.fullName}
                 onChange={handleChange}
-                className="w-full border border-gray-200 text-gray-900 text-sm px-4 py-3 rounded-2xl bg-[#fafafc] focus:outline-black transition"
+                className="w-full bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3.5 rounded-none focus:outline-none focus:border-black transition"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Số điện thoại</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Số điện thoại</label>
               <input
                 type="text"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
                 placeholder="VD: 0912345678"
-                className="w-full border border-gray-200 text-gray-900 text-sm px-4 py-3 rounded-2xl bg-[#fafafc] focus:outline-black transition"
+                className="w-full bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3.5 rounded-none focus:outline-none focus:border-black transition"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Căn cước công dân (CCCD)</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Căn cước công dân (CCCD)</label>
               <input
                 type="text"
                 name="cccd"
                 value={formData.cccd}
                 onChange={handleChange}
                 placeholder="Số CCCD / CMND"
-                className="w-full border border-gray-200 text-gray-900 text-sm px-4 py-3 rounded-2xl bg-[#fafafc] focus:outline-black transition"
+                className="w-full bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3.5 rounded-none focus:outline-none focus:border-black transition"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Giới tính</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Giới tính</label>
               <select
                 name="gender"
                 value={formData.gender}
                 onChange={handleChange}
-                className="w-full border border-gray-200 text-gray-900 text-sm px-4 py-3 rounded-2xl bg-[#fafafc] focus:outline-black transition cursor-pointer"
+                className="w-full bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3.5 rounded-none focus:outline-none focus:border-black transition cursor-pointer"
               >
                 <option value="">Chọn giới tính</option>
                 <option value="NAM">Nam</option>
@@ -304,25 +307,25 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Ngày sinh</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Ngày sinh</label>
               <input
                 type="date"
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleChange}
-                className="w-full border border-gray-200 text-gray-900 text-sm px-4 py-3 rounded-2xl bg-[#fafafc] focus:outline-black transition"
+                className="w-full bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3.5 rounded-none focus:outline-none focus:border-black transition"
               />
             </div>
 
             <div className="flex flex-col gap-2 md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Địa chỉ giao hàng</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Địa chỉ giao hàng</label>
               <input
                 type="text"
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
                 placeholder="VD: 123 Nguyễn Văn Bảo, Phường 4, Gò Vấp, TP.HCM"
-                className="w-full border border-gray-200 text-gray-900 text-sm px-4 py-3 rounded-2xl bg-[#fafafc] focus:outline-black transition"
+                className="w-full bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3.5 rounded-none focus:outline-none focus:border-black transition"
               />
             </div>
 
@@ -332,9 +335,9 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full md:w-auto px-10 py-4 rounded-2xl text-xs font-semibold uppercase tracking-[0.2em] transition bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full md:w-auto px-10 py-4 rounded-none text-xs font-bold uppercase tracking-[0.2em] transition bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Đang lưu...' : 'Lưu thông tin'}
+              {saving ? 'ĐANG LƯU...' : 'LƯU THÔNG TIN'}
             </button>
           </div>
 
