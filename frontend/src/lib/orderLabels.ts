@@ -18,6 +18,25 @@ export const SHIPPING_STATUS_LABEL: Record<ShippingStatus, string> = {
   CANCELLED: 'Đã hủy',
 };
 
+// ⚡ G4 (2026-09-02): trích ra dùng chung — trước đây chỉ khai báo cục bộ
+// trong admin/orders/page.tsx, giờ orders/page.tsx (modal chi tiết) cũng
+// cần đúng bảng màu này cho badge shippingStatus.
+export const SHIPPING_STATUS_BADGE: Record<string, string> = {
+  PENDING: 'bg-gray-100 text-gray-700',
+  PROCESSING: 'bg-blue-100 text-blue-800',
+  SHIPPED: 'bg-amber-100 text-amber-800',
+  DELIVERED: 'bg-green-100 text-green-800',
+  CANCELLED: 'bg-red-100 text-red-800',
+};
+
+// ⚡ G4 (2026-09-02): dùng cho modal chi tiết orders/page.tsx +
+// orders/lookup/page.tsx. KHÔNG đổi checkout/page.tsx (đang dùng ternary
+// inline y hệt nội dung) — tránh đụng lại file vừa test luồng tiền thật.
+export const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  COD: 'Thanh toán khi nhận hàng',
+  BANK_TRANSFER: 'Chuyển khoản VietQR',
+};
+
 // 🛡️ Hướng B (2026-09-02): VietQR PENDING KHÔNG được gọi mập mờ là "Chưa
 // thanh toán" giống COD PENDING (COD PENDING là trạng thái bình thường —
 // khách sẽ trả tiền khi nhận hàng). VietQR PENDING nghĩa là tiền CHƯA về,

@@ -478,16 +478,20 @@ thẳng vào sửa dù đã biết rõ vấn đề ở G2):**
 ưu tiên sửa cụ thể cho từng trang/component — KHÔNG tự ý sửa hàng loạt khi
 chưa có danh sách đã duyệt.
 
-**G4 — Ghi nhận 2026-09-01, CHƯA làm (chờ Plan riêng được duyệt)**: người
-dùng nhận xét `/orders` (lịch sử đơn hàng) có vấn đề TỶ LỆ bố cục — khung mỗi
-đơn to nhưng nội dung quan trọng (sản phẩm, số tiền) hiện quá nhỏ so với
-khung, mất cân đối thị giác. Việc cần làm khi bắt tay vào: (a) audit lại
-`/orders` cụ thể, đề xuất bố cục ưu tiên làm nổi bật sản phẩm/số tiền/trạng
-thái thay vì để khoảng trắng/viền chiếm phần lớn diện tích; (b) rà soát các
-trang đã đổi style ở Đợt B/C (`profile`, `orders/lookup`, `change-password`,
-`cart`, `checkout`) xem có vấn đề tỷ lệ tương tự không; (c) xem xét có cần
-thêm trang "Chi tiết đơn hàng" riêng hay không — hiện `/orders` chỉ liệt kê
-tóm tắt, đối chiếu xem đã đủ thông tin hay cần trang mới.
+**G4 — ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02)**: `/orders` từng có vấn đề TỶ LỆ bố
+cục (ảnh sản phẩm chỉ `w-12 h-12`, nhỏ hơn hẳn mọi nơi khác trong dự án —
+`cart.tsx` dùng `w-20 h-20`) và thiếu nhiều field đã có sẵn từ API
+(`shippingStatus`, `paymentMethod`, `address`, `discountCode/Amount`,
+`createdAt`, màu biến thể) — đã sửa toàn bộ, xem PROGRESS.md để biết chi
+tiết. Quyết định đã áp dụng cho câu hỏi (c) "trang chi tiết riêng hay
+modal": dùng **modal chi tiết tại chỗ** ở `orders/page.tsx` (đọc data đã có
+sẵn trong state, không gọi thêm API, không tạo route mới) — KHÔNG tạo trang
+`/orders/[id]`. Đã rà soát (b): `profile`/`cart`/`checkout`/
+`change-password` KHÔNG có vấn đề tỷ lệ tương tự (form/grid tự lấp đầy
+khung, hoặc ảnh đã đủ lớn) — chủ động không đụng, đặc biệt không đụng lại
+`checkout.tsx` vì vừa test luồng tiền thật kỹ. `orders/lookup/page.tsx`
+cũng có bug đã sửa: `shippingStatus` từng in RAW enum tiếng Anh thay vì qua
+`SHIPPING_STATUS_LABEL`.
 
 ### 3. Nhóm D — Pháp lý & Tuân thủ (BẮT BUỘC trước khi public thật)
 - Trang /privacy-policy: Chính sách bảo mật — BẮT BUỘC theo luật vì hệ thống

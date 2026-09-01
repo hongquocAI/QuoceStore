@@ -18,6 +18,37 @@
 
 ### Đang làm / Việc tiếp theo ngay
 
+**✅ G4 — Cải thiện bố cục `/orders` + chi tiết đơn hàng đầy đủ ĐÃ ĐÓNG
+HOÀN TOÀN (2026-09-02).** Ghi nhận từ 2026-09-01 trong `CLAUDE.md`, đã vào
+Plan Mode audit kỹ trước khi code (số liệu cụ thể, không cảm tính):
+- **Root cause tỷ lệ**: ảnh sản phẩm trong `orders/page.tsx` chỉ `w-12 h-12`
+  (48px) — nhỏ hơn hẳn mọi nơi khác trong dự án hiển thị ảnh sản phẩm
+  (`cart/page.tsx` dùng `w-20 h-20`); card mỗi đơn nằm trong `max-w-5xl`
+  dùng `flex justify-between` nên trên màn rộng khoảng trắng giữa khối ảnh
+  và khối giá chiếm phần lớn — đúng cảm giác "khung to, nội dung nhỏ".
+- **Dữ liệu vốn đã đủ, chỉ thiếu render**: xác nhận
+  `OrdersService.findByUser()`/`lookupGuestOrder()` đã `include` đầy đủ
+  `product`/`variant`, có `shippingStatus`/`paymentMethod`/`address`/
+  `discountCode`/`discountAmount`/`createdAt` — **toàn bộ G4 là việc
+  Frontend thuần túy, không sửa backend, không thêm API**.
+- Đã sửa: `orders/page.tsx` — ảnh `w-12→w-16`, text `xs→sm`, thêm màu biến
+  thể, thêm `createdAt` + badge `shippingStatus` (cạnh badge `paymentStatus`
+  có sẵn), thêm nút "Xem chi tiết" mở **modal chi tiết tại chỗ** (đọc data
+  đã có sẵn trong state `orders`, KHÔNG gọi API thêm) hiển thị đầy đủ:
+  2 badge trạng thái, phương thức thanh toán, địa chỉ, giảm giá (nếu có),
+  từng item (ảnh/tên/màu/SL/đơn giá/thành tiền), tổng tiền.
+  `orders/lookup/page.tsx` — sửa bug `shippingStatus` in RAW enum tiếng Anh
+  (không qua `SHIPPING_STATUS_LABEL`), thêm ảnh sản phẩm vào item, thêm
+  dòng phương thức thanh toán + giảm giá (nếu có).
+  `frontend/src/lib/orderLabels.ts` — thêm `SHIPPING_STATUS_BADGE` (trích
+  từ `admin/orders/page.tsx`, tránh chép đôi) và `PAYMENT_METHOD_LABEL`
+  dùng chung.
+- **Chủ động KHÔNG đụng**: `checkout.tsx`/`cart.tsx`/`profile.tsx`/
+  `change-password.tsx` (đã audit, không có vấn đề tỷ lệ tương tự — xem
+  Nhật ký chi tiết); không tạo trang `/orders/[id]` riêng (modal đủ, không
+  cần route mới); không gộp modal chi tiết khách hàng với modal admin
+  (2 ngữ cảnh khác nhau).
+
 **✅ 2 việc UX sau "Hướng B" ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02), người dùng test
 PASS toàn bộ:**
 
@@ -1639,3 +1670,75 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
 - **Lưu ý/vấn đề gặp phải**: người dùng từng báo nghi ngờ có bug ở lượt test
   đầu, sau xác nhận lại là hiểu nhầm thao tác test (không phải bug code) —
   không có thay đổi code nào phát sinh từ việc này, chỉ xác nhận lại PASS.
+
+### [2026-09-02] Đã hoàn thành: G4 — Cải thiện bố cục `/orders` + chi tiết đơn hàng đầy đủ
+
+- **Bối cảnh**: G4 ghi nhận từ 2026-09-01 (`CLAUDE.md` mục Nhóm G) — người
+  dùng nhận xét `/orders` lệch tỷ lệ (khung to, nội dung nhỏ). Trước khi
+  code, người dùng yêu cầu đọc lại đúng nội dung G4 gốc + bổ sung rõ yêu
+  cầu về khối chi tiết đơn hàng (đầy đủ sản phẩm/địa chỉ/phương thức/2
+  trạng thái/giảm giá/tổng tiền) + audit có số liệu thật, không cảm tính,
+  trước khi vào Plan Mode.
+- **Audit (trước khi code)**: đọc thật `orders/page.tsx`, so ảnh sản phẩm
+  `w-12 h-12` (48px) với `cart/page.tsx:85` (`w-20 h-20`, 80px) — xác nhận
+  đây là nơi ảnh nhỏ nhất trong dự án cho cùng loại nội dung, đặt trong
+  card `max-w-5xl` dùng `flex justify-between` nên trên màn rộng khoảng
+  trắng giữa khối ảnh/khối giá chiếm phần lớn chiều ngang. Đọc lại
+  `OrdersService.findByUser()`/`lookupGuestOrder()`
+  (`orders.service.ts:247-289`) xác nhận `include: { orderItems: {
+  product, variant } }` đã đầy đủ, không giới hạn field — **kết luận toàn
+  bộ G4 là việc Frontend thuần túy**, không cần sửa backend. Rà soát
+  `profile`/`cart`/`checkout`/`change-password` (đọc lại kích thước ảnh,
+  cấu trúc grid/form) — không thấy vấn đề tỷ lệ tương tự, quyết định không
+  đụng (đặc biệt `checkout.tsx` vừa test luồng tiền thật kỹ, chủ động tránh
+  rủi ro không cần thiết).
+- **Quyết định kiến trúc (đã trình bày trong Plan, người dùng duyệt)**:
+  chọn **modal chi tiết tại chỗ** ở `orders/page.tsx` thay vì tạo route
+  `/orders/[id]` riêng — vì `findByUser()` đã trả về đầy đủ `product`/
+  `variant` cho MỌI đơn trong danh sách, mở modal chỉ cần
+  `setDetailOrder(order)` với data đã có sẵn trong state, không cần gọi API
+  thêm, không cần route/param mới. `orders/lookup/page.tsx` chỉ hiển thị
+  đúng 1 đơn sau tra cứu — bản thân khối kết quả đã là "khối chi tiết",
+  không cần modal riêng, chỉ bổ sung field thiếu tại chỗ.
+- **File đã sửa**:
+  - `frontend/src/lib/orderLabels.ts` — thêm `SHIPPING_STATUS_BADGE` (trích
+    từ `admin/orders/page.tsx`, tránh chép đôi dictionary màu badge) và
+    `PAYMENT_METHOD_LABEL` (COD/BANK_TRANSFER) dùng chung.
+  - `frontend/src/app/admin/orders/page.tsx` — đổi sang import
+    `SHIPPING_STATUS_BADGE` từ `orderLabels.ts` thay vì khai báo cục bộ.
+  - `frontend/src/app/orders/page.tsx` — viết lại: ảnh item `w-12→w-16`,
+    tên/giá `text-xs→text-sm`, thêm dòng màu biến thể nếu có, thêm
+    `createdAt` + badge `shippingStatus` cạnh badge `paymentStatus` ở
+    header mỗi card, thêm nút "Xem chi tiết" (`setDetailOrder(order)`) +
+    modal chi tiết đọc-chỉ mới (2 badge, phương thức thanh toán, địa chỉ,
+    giảm giá nếu có, đầy đủ item, tổng tiền) — JSX riêng, KHÔNG dùng chung
+    `ConfirmModal` (sai mục đích, modal này không có hành động
+    confirm/cancel) và KHÔNG gộp với modal `detailOrder` của
+    `admin/orders/page.tsx` (2 ngữ cảnh khác nhau, admin có hành động đổi
+    trạng thái bên trong).
+  - `frontend/src/app/orders/lookup/page.tsx` — sửa bug hiển thị
+    `{order.shippingStatus}` (RAW enum tiếng Anh) →
+    `{SHIPPING_STATUS_LABEL[order.shippingStatus]}`; thêm ảnh sản phẩm vào
+    mỗi item (trước đây chỉ có text); thêm dòng "Phương thức thanh toán";
+    thêm dòng "Giảm giá" (tông emerald, khớp `cart.tsx`/`checkout.tsx`) khi
+    `discountAmount > 0`.
+  - `CLAUDE.md` — cập nhật mục G4 từ "CHƯA làm" sang "ĐÃ ĐÓNG HOÀN TOÀN" +
+    tóm tắt quyết định modal-tại-chỗ.
+- **Vấn đề kỹ thuật gặp phải khi sửa**: `SHIPPING_STATUS_LABEL`/
+  `SHIPPING_STATUS_BADGE` khai báo kiểu `Record<ShippingStatus, string>`
+  (union literal, không có index signature dạng string) — indexing bằng
+  `order.shippingStatus` (kiểu `any` vì `orders` state là `any[]`) bị TS
+  báo lỗi `TS7053` ("Element implicitly has an 'any' type") ở CẢ 2 file
+  (`orders/page.tsx`, `orders/lookup/page.tsx`). Sửa bằng cách import type
+  `ShippingStatus` từ `@/types` và ép kiểu tường minh
+  `order.shippingStatus as ShippingStatus` tại từng chỗ index — không đổi
+  kiểu 2 dictionary (giữ nguyên tính exhaustive-check hữu ích ở
+  `admin/orders/page.tsx`).
+- **Đã test**: `npx tsc --noEmit` sạch sau khi sửa lỗi TS7053. Đúng 4 file
+  thay đổi như Plan dự kiến (không có file backend nào, khớp đúng dự đoán
+  "toàn bộ là Frontend"). Người dùng sẽ tự test UI: `/orders` xem ảnh/badge
+  lớn hơn rõ rệt + modal chi tiết đầy đủ field, không gọi thêm request nào;
+  `/orders/lookup` xem `shippingStatus` đã dịch tiếng Việt + có ảnh sản
+  phẩm + phương thức thanh toán + giảm giá nếu có.
+- **Lưu ý/vấn đề gặp phải**: không có vấn đề ngoài dự kiến, ngoại trừ lỗi
+  TS7053 đã nêu trên (sửa nhanh bằng ép kiểu, không phải lỗi logic).

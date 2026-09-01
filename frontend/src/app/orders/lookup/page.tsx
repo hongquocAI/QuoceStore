@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { api, getApiErrorMessage } from '@/lib/api';
-import { getPaymentStatusDisplay } from '@/lib/orderLabels';
+import { getPaymentStatusDisplay, SHIPPING_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '@/lib/orderLabels';
+import { ShippingStatus } from '@/types';
 
 // ⚡ Nhóm G Đợt B: badge trạng thái vuông đen-trắng/đỏ theo chuẩn Storefront
 // (thay cho tông emerald/gray bo góc của hướng "gia đình Account" đã bỏ).
@@ -121,37 +122,63 @@ export default function OrderLookupPage() {
             </div>
 
             <div className="space-y-2">
-              {order.orderItems?.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-center text-xs py-2 border-b border-gray-100 last:border-none">
-                  <div>
-                    <p className="font-bold text-gray-900">{item.product?.title || 'Sản phẩm'}</p>
-                    {item.variantColorName && (
-                      <p className="text-gray-400 text-[11px] mt-0.5">Màu: {item.variantColorName}</p>
-                    )}
-                    <p className="text-gray-400 text-[11px]">SL: {item.quantity}</p>
+              {order.orderItems?.map((item: any) => {
+                const productImg = item.product?.images?.[0] || item.product?.image;
+                return (
+                  <div key={item.id} className="flex items-center justify-between text-xs py-2 border-b border-gray-100 last:border-none">
+                    <div className="flex items-center gap-3">
+                      <div className="w-16 h-16 bg-[#f4f4f4] rounded-none overflow-hidden flex-shrink-0 border border-gray-200/80 flex items-center justify-center">
+                        {productImg ? (
+                          <img src={productImg} alt={item.product?.title || 'Sản phẩm'} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[8px] text-gray-400 uppercase tracking-widest font-black">QUOCÉ</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">{item.product?.title || 'Sản phẩm'}</p>
+                        {item.variantColorName && (
+                          <p className="text-gray-400 text-[11px] mt-0.5">Màu: {item.variantColorName}</p>
+                        )}
+                        <p className="text-gray-400 text-[11px]">SL: {item.quantity}</p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-gray-900">
+                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+                        Number(item.priceAtPurchase) * item.quantity,
+                      )}
+                    </span>
                   </div>
-                  <span className="font-bold text-gray-900">
-                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                      Number(item.priceAtPurchase) * item.quantity,
-                    )}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            <div className="flex justify-between items-center pt-3 border-t border-gray-200 font-black text-sm text-gray-900 uppercase tracking-wide">
-              <span>Tổng tiền</span>
-              <span>
-                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                  Number(order.totalAmount),
-                )}
-              </span>
+            <div className="border-t border-gray-200 pt-3 space-y-2">
+              {Number(order.discountAmount) > 0 && (
+                <div className="flex justify-between items-center text-emerald-600 text-sm">
+                  <span>Giảm giá {order.discountCode ? `(${order.discountCode})` : ''}</span>
+                  <span>
+                    -{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(order.discountAmount))}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center font-black text-sm text-gray-900 uppercase tracking-wide">
+                <span>Tổng tiền</span>
+                <span>
+                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+                    Number(order.totalAmount),
+                  )}
+                </span>
+              </div>
             </div>
 
             <div className="border border-gray-200 rounded-none p-5 space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-gray-500 font-bold uppercase tracking-wide">Trạng thái giao hàng</span>
-                <span className="font-bold text-gray-900">{order.shippingStatus}</span>
+                <span className="font-bold text-gray-900">{SHIPPING_STATUS_LABEL[order.shippingStatus as ShippingStatus]}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500 font-bold uppercase tracking-wide">Phương thức thanh toán</span>
+                <span className="font-bold text-gray-900">{PAYMENT_METHOD_LABEL[order.paymentMethod] || order.paymentMethod}</span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-gray-500 font-bold uppercase tracking-wide flex-shrink-0">Địa chỉ</span>
