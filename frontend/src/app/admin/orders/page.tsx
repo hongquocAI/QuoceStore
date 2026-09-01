@@ -2,16 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { Order, ShippingStatus } from '@/types';
-
-// ⚡ Chưa từng tồn tại dictionary nhãn tiếng Việt cho status ở đâu trong repo
-// (đã grep xác nhận) — tạo mới, chỉ dùng trong phạm vi trang này.
-const SHIPPING_STATUS_LABEL: Record<ShippingStatus, string> = {
-  PENDING: 'Chờ xử lý',
-  PROCESSING: 'Đang xử lý',
-  SHIPPED: 'Đã giao vận',
-  DELIVERED: 'Đã giao hàng',
-  CANCELLED: 'Đã hủy',
-};
+import { PAYMENT_STATUS_LABEL, SHIPPING_STATUS_LABEL } from '@/lib/orderLabels';
 
 const SHIPPING_STATUS_BADGE: Record<ShippingStatus, string> = {
   PENDING: 'bg-gray-100 text-gray-700',
@@ -19,13 +10,6 @@ const SHIPPING_STATUS_BADGE: Record<ShippingStatus, string> = {
   SHIPPED: 'bg-amber-100 text-amber-800',
   DELIVERED: 'bg-green-100 text-green-800',
   CANCELLED: 'bg-red-100 text-red-800',
-};
-
-const PAYMENT_STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Chưa thanh toán',
-  PAID: 'Đã thanh toán',
-  CANCELLED: 'Đã hủy',
-  FAILED: 'Thất bại',
 };
 
 // ⚡ Đồng bộ với SHIPPING_STATUS_TRANSITIONS trong

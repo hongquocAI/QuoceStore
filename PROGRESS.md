@@ -14,39 +14,65 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-08-31)*
+*(cập nhật lần cuối: 2026-09-01)*
 
 ### Đang làm / Việc tiếp theo ngay
-**✅ Nhóm G (MỚI, portfolio polish) — G1 (Audit toàn diện Frontend) ĐÃ
-XONG (2026-08-31)** — 19 file trong `frontend/src/app` + `components` đã
-audit qua 3 agent song song, trình bày bảng đầy đủ cho người dùng. Phát
-hiện chính: "gia đình Account" không đồng nhất thật (profile, orders/
-lookup, change-password đang lệch mang style Storefront); `register/
-page.tsx` lệch nặng nhất dự án; `AiChatWidget` tự tạo gia đình thứ 4; 2 file
-dead code (`CheckoutQr.tsx`, `AdminGuard.tsx`); xung đột font 3 nguồn.
-Người dùng đã chốt thứ tự 4 đợt: Dọn rác + AiChatWidget + font → Kéo trang
-lạc về đúng chuẩn → Polish chi tiết → Feature gap.
 
-**✅ Nhóm G — Đợt 1 (Dọn rác + AdminGuard + AiChatWidget + Font) ĐÃ ĐÓNG
-HOÀN TOÀN (2026-08-31).** Chi tiết đầy đủ xem Nhật ký chi tiết. Người dùng
-test UI thật PASS 5/5 mục.
+**✅ Nhóm G — ĐẢO NGƯỢC thiết kế + 2 bug ĐÃ ĐÓNG HOÀN TOÀN (2026-09-01).**
+Người dùng xem trực tiếp kết quả Đợt 3 cũ (bo góc mềm, nền `#fafafc`,
+`font-serif`) và KHÔNG hài lòng — **bỏ hẳn định hướng "2 gia đình style"**
+(Storefront vs Account) đã chốt ngày 2026-08-31, thay bằng **1 style duy
+nhất cho toàn site: vuông vức, mạnh mẽ, tương phản đen-trắng** (theo chuẩn
+`login/page.tsx` + `ProductCard.tsx`). Đã cập nhật `CLAUDE.md` mục Nhóm G
+ghi rõ quyết định đảo ngược + bảng style token chuẩn dùng cho mọi trang sau
+này. Làm theo 3 đợt nhỏ, mỗi đợt `tsc --noEmit` sạch + người dùng test tay +
+commit/push riêng:
 
-**✅ Nhóm G — Đợt 2 (Đồng bộ Login/Register + Bật Google Login thật) ĐÃ ĐÓNG
-HOÀN TOÀN (2026-08-31).** Phạm vi Đợt 2 đã ĐỔI so với dự kiến ban đầu — 3
-trang `profile`/`orders-lookup`/`change-password` (lệch style Account) DỜI
-sang đợt riêng sau, thay vào đó Đợt 2 gồm 2 phần: (A) đồng bộ
-`register/page.tsx` khớp `login/page.tsx` + link 2 chiều + toggle hiện/ẩn
-mật khẩu + xác nhận mật khẩu + chỉ báo độ mạnh; (B) bật chính thức Google
-Login (`@react-oauth/google`, `GOOGLE_CLIENT_ID` thật). **Phát hiện + sửa 1
-lỗ hổng bảo mật nghiêm trọng** trong lúc khảo sát — xem Nhật ký chi tiết.
-Người dùng test UI thật PASS 12/12 mục. Đã dọn 1 tài khoản test
-(`cbb@gmail.com`), giữ lại tài khoản Google thật của người dùng dùng để
-test (không phải rác).
+- **Đợt A** (commit `837c9b3`): 2 bug độc lập với style.
+  - **Bug 1** (chặn hoàn toàn tính năng lưu hồ sơ, mọi lần Lưu đều 400): root
+    cause có **3 nguyên nhân cộng dồn**, không chỉ 1 như nghi ngờ ban đầu —
+    (1) `profile/page.tsx` gửi thừa `avatarUrl` trong payload `PATCH
+    /users/:id`, field này không có trong `UpdateProfileDto`
+    (`forbidNonWhitelisted` chặn); (2) **`@IsOptional()` của class-validator
+    chỉ bỏ qua `null`/`undefined`, KHÔNG bỏ qua chuỗi rỗng `''`** — field để
+    trống vẫn bị `@Matches`/`@IsEnum` từ chối, đây là nguyên nhân THẬT của
+    các lỗi CCCD/SĐT tưởng không liên quan; (3) `message` lỗi từ
+    `ValidationPipe` là mảng string, Frontend đổ thẳng vào JSX gây dính chữ
+    liền nhau khó đọc. Sửa: build payload PATCH tường minh (chỉ 6 field DTO
+    chấp nhận, bỏ field rỗng), thêm helper `getApiErrorMessage()`
+    (`frontend/src/lib/api.ts`) chuẩn hóa lỗi mảng thành nhiều dòng. Backend
+    giữ nguyên — avatar đã có endpoint riêng `PATCH /users/:id/avatar`.
+  - **Bug 2** (thiếu điều hướng): `Header.tsx` thêm "Tra cứu đơn hàng" +
+    "Đổi mật khẩu" vào dropdown tài khoản (đã đăng nhập), thêm "Tra cứu đơn"
+    vào nav chính (chỉ hiện khi CHƯA đăng nhập — đúng nhóm khách cần nhất).
+  - Người dùng test PASS 8/10 (2 mục còn lại là câu hỏi xác nhận thiết kế,
+    không phải bug — xem "⚠️ Known Issue" dưới đây).
+- **Đợt B** (commit `90c2254`): viết lại JSX/className của `profile/
+  page.tsx`, `orders/lookup/page.tsx`, `change-password/page.tsx` sang style
+  vuông vức. Chỉ đổi style, giữ nguyên 100% logic (kể cả fix Bug 1 ở Đợt A và
+  các fix logic đã có từ Đợt 3 cũ, VD `change-password` dùng `api.patch`
+  thay `fetch()` thô).
+- **Đợt C**: viết lại `cart/page.tsx`, `checkout/page.tsx`, `orders/
+  page.tsx` (lịch sử đơn) sang cùng style — lần đầu các trang này được đụng
+  tới cho mục đích style. Trích `PAYMENT_STATUS_LABEL`/`SHIPPING_STATUS_LABEL`
+  ra `frontend/src/lib/orderLabels.ts` (dùng chung giữa `admin/orders/
+  page.tsx` và `orders/page.tsx`, tránh chép đôi dictionary nhãn tiếng Việt).
+  Giữ nguyên 100% logic nghiệp vụ (áp mã giảm giá, tạo QR PayOS, redirect
+  401 → `/login`).
 
-⏳ **Đợt 3 CHƯA bắt đầu** — chờ người dùng xác nhận. Đợt 3 gồm: kéo
-`profile/page.tsx`, `orders/lookup/page.tsx`, `change-password/page.tsx` về
-đúng chuẩn Account (mục này vốn là "Đợt 2 gốc", đã dời do người dùng mở
-rộng phạm vi Đợt 2 sang Login/Register + Google).
+⚠️ **Known Issue mới phát sinh, CHƯA xử lý (không phải bug, là giới hạn UX
+đã cân nhắc và tạm chấp nhận)**: Profile không có cách xóa trắng 1 field
+optional (CCCD/SĐT/giới tính) sau khi đã từng lưu — để trống rồi bấm Lưu chỉ
+bị bỏ qua (không gửi lên server), giữ nguyên giá trị cũ trong DB. Đây là hệ
+quả ĐÚNG của thiết kế "field rỗng = không đổi" (tránh vô tình xóa dữ liệu
+khi chỉ muốn sửa field khác). Muốn hỗ trợ xóa hẳn cần thêm cơ chế tường minh
+(nút X riêng từng field, hoặc gửi `null` thay vì bỏ field) — cần sửa cả DTO
+backend, ngoài phạm vi Frontend-only đã chốt cho đợt sửa này. Làm sau nếu
+người dùng thấy cần.
+
+**⏳ Việc tiếp theo**: G3 (polish chi tiết) và G4 (feature gap — review sản
+phẩm, timeline đơn hàng, chọn item giỏ hàng riêng lẻ, sổ địa chỉ) theo đúng
+roadmap 4 đợt gốc trong `CLAUDE.md`, chưa bắt đầu.
 
 **✅ Nhóm F (phần 1) — Discount thật vào `OrdersService.create()` ĐÃ XONG**
 (code + verify bằng request thật, dữ liệu test đã dọn sạch).
@@ -1210,3 +1236,63 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   Điểm cần cẩn trọng đã xử lý đúng: phân biệt được tài khoản test rác với
   tài khoản Google thật của người dùng trước khi xóa (đã hỏi xác nhận thay
   vì tự ý xóa cả 2), tránh xóa nhầm dữ liệu thật.
+
+### [2026-09-01] Đã hoàn thành: Nhóm G — Đảo ngược "2 gia đình style" → 1 style vuông vức toàn site + 2 bug (avatarUrl, thiếu điều hướng)
+
+- **Bối cảnh**: người dùng xem trực tiếp kết quả Đợt 3 cũ (bo góc mềm, nền
+  `#fafafc`, `font-serif`, xem entry Đợt 2 phía trên để đối chiếu định hướng
+  gốc) và không hài lòng — yêu cầu đảo ngược sang 1 style vuông vức duy nhất
+  cho toàn site, đúng chuẩn `login/page.tsx`. Bàn giao gồm 6 trang + 2 bug,
+  chia làm 3 đợt nhỏ theo đề xuất, mỗi đợt có `tsc --noEmit` sạch + người
+  dùng test tay + commit/push riêng trước khi sang đợt sau.
+- **File đã sửa**:
+  - `CLAUDE.md` — thay khối "Định hướng thiết kế đã CHỐT" trong mục Nhóm G:
+    ghi rõ quyết định đảo ngược ngày 2026-09-01 + lý do, bảng style token
+    chuẩn (nền/thẻ/heading/label/input/nút/badge/banner lỗi), danh sách token
+    cấm dùng lại (`rounded-2xl/3xl/full`, `font-serif`, `bg-[#fafafc]`), và
+    bài học kỹ thuật về `@IsOptional()` + chuỗi rỗng.
+  - `frontend/src/lib/api.ts` — thêm `getApiErrorMessage(err, fallback)`:
+    chuẩn hóa `message` lỗi (có thể là mảng string từ `ValidationPipe`)
+    thành 1 chuỗi nhiều dòng, tránh JSX đổ mảng ra dính chữ liền nhau.
+  - `frontend/src/app/profile/page.tsx` — **Bug 1**: `handleUpdateProfile`
+    build payload PATCH tường minh (map từng field, không destructuring),
+    chỉ đưa vào payload các field CÓ GIÁ TRỊ trong đúng 6 field
+    `UpdateProfileDto` chấp nhận (loại `avatarUrl` — đã có endpoint riêng
+    `PATCH /users/:id/avatar` ghi trực tiếp DB), nâng validate SĐT/CCCD
+    client-side khớp đúng regex backend. Viết lại toàn bộ JSX sang style
+    vuông vức (giữ nguyên logic).
+  - `frontend/src/components/Header.tsx` — **Bug 2**: thêm link "Tra cứu đơn
+    hàng" (→ `/orders/lookup`) + "Đổi mật khẩu" (→ `/change-password`) vào
+    dropdown tài khoản; thêm "Tra cứu đơn" vào nav chính, chỉ hiện khi
+    `!user` (khách vãng lai — nhóm cần Guest Order Lookup nhất, không có
+    dropdown tài khoản để thấy link kia).
+  - `frontend/src/app/orders/lookup/page.tsx`,
+    `frontend/src/app/change-password/page.tsx` — viết lại toàn bộ JSX sang
+    style vuông vức, giữ nguyên logic (xử lý 429 riêng biệt ở lookup; fix
+    `api.patch` thay `fetch()` thô ở change-password, đã có từ trước).
+  - `frontend/src/app/cart/page.tsx`, `frontend/src/app/checkout/page.tsx`,
+    `frontend/src/app/orders/page.tsx` — lần đầu viết lại JSX sang style
+    vuông vức (trước đó chưa từng đụng tới cho mục đích style). Giữ nguyên
+    100% logic nghiệp vụ: áp mã giảm giá (`handleApplyCoupon`,
+    `sessionStorage` mang mã sang checkout), re-validate mã ở checkout,
+    payload `POST /orders` (chỉ gửi mã, không gửi %/số tiền), luồng tạo QR
+    PayOS, redirect `/login` khi 401 ở lịch sử đơn hàng.
+  - `frontend/src/lib/orderLabels.ts` (MỚI) — trích `PAYMENT_STATUS_LABEL`
+    và `SHIPPING_STATUS_LABEL` ra dùng chung, thay cho bản khai báo cục bộ
+    trước đây chỉ có trong `admin/orders/page.tsx`. `orders/page.tsx` (lịch
+    sử đơn khách) trước đây hiện thẳng mã status thô không dịch — nay dùng
+    chung dictionary, tránh chép đôi.
+- **Đã test**: `npx tsc --noEmit` sạch sau mỗi đợt (A/B/C). Grep xác nhận cả
+  6 file không còn `rounded-2xl|rounded-3xl|font-serif|#fafafc`. Người dùng
+  tự test tay Đợt A qua UI thật: **8/10 mục PASS** — 2 mục còn lại không phải
+  bug, là câu hỏi xác nhận thiết kế (xem "⚠️ Known Issue" ở phần Trạng thái
+  hiện tại: field `fullName` cố ý bắt buộc ở tầng UI khác 5 field optional
+  còn lại — đúng thiết kế cũ; và hành vi "để trống field rồi Lưu → giữ giá
+  trị cũ" là hệ quả đúng của "field rỗng = không đổi", không xóa được field
+  đã từng khai — chấp nhận là giới hạn, chưa cần sửa). Đợt B/C người dùng
+  xác nhận qua quan sát trực quan khớp `/login`.
+- **Lưu ý/vấn đề gặp phải**: root cause Bug 1 sâu hơn nghi ngờ ban đầu của
+  người dùng (chỉ nghĩ do `avatarUrl`) — thực tế có 3 nguyên nhân cộng dồn,
+  quan trọng nhất là bài học `@IsOptional()` không bỏ qua chuỗi rỗng, áp
+  dụng cho MỌI form gửi payload có field optional trong dự án, không riêng
+  Profile. Đã ghi vào `CLAUDE.md` để không lặp lại ở form khác sau này.
