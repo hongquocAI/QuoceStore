@@ -17,6 +17,7 @@ import { DiscountsModule } from './discounts/discounts.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { BrandsModule } from './brands/brands.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
+import { CategoriesModule } from './categories/categories.module';
 import { HealthModule } from './health/health.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
@@ -105,6 +106,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     DiscountsModule,
     BrandsModule,
     SubCategoriesModule,
+    CategoriesModule,
     HealthModule,
   ],
   controllers: [],

@@ -129,7 +129,7 @@ export default function AdminProductsPage() {
   // ⚡ UX form Admin (mục 2b): mini-modal quick-add SubCategory/Brand, thay
   // window.prompt() thô. `submitting` riêng cho mini-modal này.
   const [quickAddModal, setQuickAddModal] = useState<{
-    type: 'subCategory' | 'brand';
+    type: 'category' | 'subCategory' | 'brand';
     name: string;
     logoUrl: string;
     submitting: boolean;
@@ -321,7 +321,12 @@ export default function AdminProductsPage() {
     setQuickAddModal(prev => (prev ? { ...prev, submitting: true } : prev));
 
     try {
-      if (quickAddModal.type === 'subCategory') {
+      if (quickAddModal.type === 'category') {
+        const res = await api.post('/categories', { name, slug });
+        setCategories(prev => [...prev, res.data]);
+        setFormData(prev => ({ ...prev, categoryId: res.data.id, subCategoryId: '' }));
+        setMessage({ type: 'success', text: `Đã tạo danh mục chính "${name}" thành công!` });
+      } else if (quickAddModal.type === 'subCategory') {
         const res = await api.post('/sub-categories', { name, slug, categoryId: formData.categoryId });
         setSubCategories(prev => [...prev, res.data]);
         setFormData(prev => ({ ...prev, subCategoryId: res.data.id }));
@@ -1050,7 +1055,16 @@ export default function AdminProductsPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Danh mục chính</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Danh mục chính</label>
+                      <button
+                        type="button"
+                        onClick={() => setQuickAddModal({ type: 'category', name: '', logoUrl: '', submitting: false })}
+                        className="text-[10px] font-bold text-blue-600 hover:underline"
+                      >
+                        + Thêm mới
+                      </button>
+                    </div>
                     <select
                       name="categoryId"
                       required
@@ -1472,7 +1486,11 @@ export default function AdminProductsPage() {
           <div className="bg-white border border-gray-300 w-full max-w-md p-6 rounded-none shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
               <h3 className="text-xs font-black uppercase tracking-widest text-black">
-                {quickAddModal.type === 'subCategory' ? 'Thêm danh mục con mới' : 'Thêm thương hiệu mới'}
+                {quickAddModal.type === 'category'
+                  ? 'Thêm danh mục chính mới'
+                  : quickAddModal.type === 'subCategory'
+                    ? 'Thêm danh mục con mới'
+                    : 'Thêm thương hiệu mới'}
               </h3>
               <button
                 type="button"
@@ -1485,14 +1503,18 @@ export default function AdminProductsPage() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
-                  {quickAddModal.type === 'subCategory' ? 'Tên danh mục con' : 'Tên thương hiệu'}
+                  {quickAddModal.type === 'category'
+                    ? 'Tên danh mục chính'
+                    : quickAddModal.type === 'subCategory'
+                      ? 'Tên danh mục con'
+                      : 'Tên thương hiệu'}
                 </label>
                 <input
                   type="text"
                   autoFocus
                   value={quickAddModal.name}
                   onChange={(e) => setQuickAddModal(prev => (prev ? { ...prev, name: e.target.value } : prev))}
-                  placeholder={quickAddModal.type === 'subCategory' ? 'VD: Tai nghe' : 'VD: Anker'}
+                  placeholder={quickAddModal.type === 'category' ? 'VD: Phụ kiện' : quickAddModal.type === 'subCategory' ? 'VD: Tai nghe' : 'VD: Anker'}
                   className="bg-white border border-gray-300 text-black text-xs font-medium px-4 py-3 rounded-none"
                 />
               </div>
