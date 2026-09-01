@@ -14,9 +14,33 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-09-02)*
+*(cập nhật lần cuối: 2026-09-02, phiên làm việc tự động qua đêm)*
 
 ### Đang làm / Việc tiếp theo ngay
+
+**✅ Nhóm D — Pháp lý & Tuân thủ ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02, làm tự động
+qua đêm, chưa có người dùng test UI thật).** 3 trang mới `/privacy-policy`,
+`/terms`, `/return-policy` — nội dung đầy đủ, nghiêm túc theo đúng khung
+pháp lý (KHÔNG sơ sài kiểu portfolio, đúng yêu cầu chỉnh lại của người
+dùng), tham chiếu Nghị định 13/2023/NĐ-CP, có disclaimer cuối mỗi trang.
+Thêm `Footer.tsx` (mới, dự án chưa từng có) để 3 trang không bị orphan.
+Toàn bộ chi tiết xem Nhật ký chi tiết `[2026-09-02]` mục "Nhóm D".
+
+**🔍 Cần người dùng kiểm tra bằng mắt (chưa test UI thật)**:
+1. Đọc lại nội dung 3 trang pháp lý — tôi tự viết theo hướng nghiêm túc/
+   đầy đủ đúng yêu cầu, nhưng câu chữ cụ thể có thể cần góp ý thêm (đặc
+   biệt mốc "7 ngày" ở Return Policy Mục 2 — tôi tự chọn con số tham khảo
+   phổ biến, ghi rõ trong trang là "mức tham khảo", có thể cần đổi).
+2. Xem `Footer` hiển thị đúng vị trí (luôn ở cuối trang) trên vài trang
+   khác nhau — đã tự động hóa được `tsc --noEmit` + `npm run build` (cả 3
+   route mới compile/pre-render OK), nhưng KHÔNG thể tự "nhìn" giao diện.
+3. Xác nhận domain liên hệ `support@quoce.vn` dùng trong 3 trang có ổn
+   không, hay muốn đổi (tôi chọn domain hư cấu `@quoce.vn` đã có sẵn trong
+   code cho nhất quán, không bịa domain mới).
+
+**Không có mục "Cần người dùng xác nhận" nào bị treo** — câu hỏi CCCD bắt
+buộc/optional đã tự chốt được bằng cách audit code thật (xem Nhật ký chi
+tiết), không phải suy đoán, nên không cần dừng lại chờ.
 
 **✅ G4 — Cải thiện bố cục `/orders` + chi tiết đơn hàng đầy đủ ĐÃ ĐÓNG
 HOÀN TOÀN (2026-09-02).** Ghi nhận từ 2026-09-01 trong `CLAUDE.md`, đã vào
@@ -1742,3 +1766,63 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   phẩm + phương thức thanh toán + giảm giá nếu có.
 - **Lưu ý/vấn đề gặp phải**: không có vấn đề ngoài dự kiến, ngoại trừ lỗi
   TS7053 đã nêu trên (sửa nhanh bằng ép kiểu, không phải lỗi logic).
+
+### [2026-09-02] Đã hoàn thành: Nhóm D — 3 trang pháp lý + Footer (làm tự động qua đêm)
+
+- **Bối cảnh**: người dùng đi ngủ, giao việc chạy tự động qua đêm. Yêu cầu
+  ban đầu ("mẫu chuẩn portfolio, không cần kỹ càng") sau đó ĐƯỢC CHỈNH LẠI
+  ngay giữa lúc đang vào Plan Mode: viết nghiêm túc, đúng khung pháp lý
+  thật, disclaimer đặt CUỐI trang (không phải đầu). Plan đã cập nhật theo
+  đúng bản chỉnh lại này trước khi code.
+- **Câu hỏi treo CCCD — đã chốt bằng audit code, không phải suy đoán**: đọc
+  `backend/prisma/schema.prisma:46` (`cccd String?`), `UpdateProfileDto.cccd`
+  (`@IsOptional()`), và `register/page.tsx` (không có field CCCD nào) —
+  xác nhận CCCD ĐÃ LUÔN optional, không bắt buộc ở bất kỳ đâu trong luồng
+  hiện tại. Không cần đổi code, không cần dừng lại hỏi người dùng — nội
+  dung Privacy Policy nói đúng sự thật đã verify.
+- **File mới**:
+  - `frontend/src/app/privacy-policy/page.tsx` — 9 mục: phạm vi áp dụng,
+    loại dữ liệu thu thập (liệt kê đúng field thật trong `User` model, ghi
+    rõ CCCD tự nguyện), mục đích theo TỪNG loại dữ liệu (không gộp chung),
+    thời gian lưu trữ, chia sẻ bên thứ 3 (nêu đúng PayOS/Cloudinary/hạ
+    tầng lưu trữ đang dùng thật, không bịa), quyền người dùng (biết/đồng
+    ý/truy cập/chỉnh sửa/xóa/ngừng xử lý/khiếu nại), biện pháp bảo mật kỹ
+    thuật đã áp dụng thật (bcrypt, cookie HttpOnly, rate-limit), thay đổi
+    chính sách + liên hệ, căn cứ pháp lý (Nghị định 13/2023/NĐ-CP).
+  - `frontend/src/app/terms/page.tsx` — 12 mục: định nghĩa, điều kiện tài
+    khoản, đặt hàng & giá (nêu đúng cơ chế server tự tính lại + thời điểm
+    trừ kho khác nhau COD/VietQR theo đúng "Hướng B" đã build), hủy đơn
+    (đúng state machine thật — PENDING/PROCESSING hủy được, SHIPPED/
+    DELIVERED không), phương thức thanh toán, vận chuyển, quyền/nghĩa vụ 2
+    bên, giới hạn trách nhiệm, sở hữu trí tuệ, giải quyết tranh chấp, luật
+    áp dụng.
+  - `frontend/src/app/return-policy/page.tsx` — 6 mục: điều kiện áp dụng,
+    thời hạn (7 ngày, ghi rõ là mốc tham khảo), quy trình yêu cầu, trường
+    hợp không áp dụng, hoàn tiền (nêu ĐÚNG hạn chế thật — hủy đơn tự động
+    hoàn kho nhưng hoàn tiền VietQR hiện cần Admin xử lý thủ công qua PayOS
+    Dashboard, đúng logic đã build ở `OrdersService.updateShippingStatus()`,
+    KHÔNG hứa "tự động hoàn tiền trong X ngày" sai sự thật), chi phí vận
+    chuyển hoàn trả + liên hệ.
+  - Cả 3 trang: disclaimer cuối trang đúng nguyên văn yêu cầu ("bản soạn
+    thảo tham khảo... khuyến nghị rà soát bởi chuyên gia pháp lý... KHÔNG
+    PHẢI tư vấn pháp lý chính thức"); là Server Component (không "use
+    client") vì nội dung tĩnh, dùng `export const metadata` cho SEO title.
+  - `frontend/src/components/Footer.tsx` (MỚI — dự án chưa từng có Footer)
+    — logo, 4 link (3 trang pháp lý + `/orders/lookup` tiện thể vì trang
+    đó vốn cũng orphan một phần, chỉ có trong Header khi chưa đăng nhập),
+    dòng copyright ghi rõ "Dự án demo/portfolio".
+- **File sửa**: `frontend/src/app/layout.tsx` — import + chèn `<Footer />`
+  ngay sau `<main>` (layout đã `flex flex-col` + `main flex-1` nên Footer
+  tự nằm cuối trang, không cần CSS sticky-footer thêm).
+- **Đã test (tự động hóa được, không cần người)**: `npx tsc --noEmit`
+  sạch. `npm run build` (production build) — **thành công**, cả 3 route
+  mới (`/privacy-policy`, `/terms`, `/return-policy`) compile và
+  pre-render tĩnh (○) đúng, không lỗi.
+- **KHÔNG làm** (đúng phạm vi đã chốt trong Plan): không đổi
+  `UpdateProfileDto`/schema, không thêm checkbox "đồng ý điều khoản" vào
+  `register.tsx`, không tạo migration.
+- **Lưu ý/vấn đề gặp phải**: không có vấn đề kỹ thuật ngoài dự kiến. Điểm
+  cần người dùng tự kiểm tra khi thức dậy đã ghi rõ ở mục "🔍 Cần người
+  dùng kiểm tra" phần Trạng thái hiện tại (nội dung câu chữ, vị trí Footer
+  bằng mắt, domain liên hệ `support@quoce.vn`) — không có mục nào bị
+  BLOCK/dừng giữa đường, toàn bộ Nhóm D đã hoàn thành và commit.

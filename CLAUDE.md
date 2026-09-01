@@ -493,14 +493,20 @@ khung, hoặc ảnh đã đủ lớn) — chủ động không đụng, đặc b
 cũng có bug đã sửa: `shippingStatus` từng in RAW enum tiếng Anh thay vì qua
 `SHIPPING_STATUS_LABEL`.
 
-### 3. Nhóm D — Pháp lý & Tuân thủ (BẮT BUỘC trước khi public thật)
-- Trang /privacy-policy: Chính sách bảo mật — BẮT BUỘC theo luật vì hệ thống
-  thu thập CCCD (Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân VN)
-- Trang /terms: Điều khoản dịch vụ
-- Trang /return-policy: Chính sách đổi trả/hoàn tiền
-- QUYẾT ĐỊNH CẦN NGƯỜI DÙNG XÁC NHẬN: CCCD có thực sự cần thu thập bắt buộc
-  không, hay nên optional? Nếu giữ bắt buộc, phải có chính sách bảo mật rõ
-  ràng nêu mục đích thu thập, thời gian lưu trữ, quyền của người dùng.
+### 3. Nhóm D — Pháp lý & Tuân thủ — ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02)
+- ✅ `/privacy-policy`, `/terms`, `/return-policy` — nội dung đầy đủ, nghiêm
+  túc (không sơ sài kiểu portfolio), tham chiếu Nghị định 13/2023/NĐ-CP,
+  có disclaimer cuối trang "bản soạn thảo tham khảo, không phải tư vấn
+  pháp lý chính thức". Chi tiết đầy đủ xem PROGRESS.md.
+- ✅ **Câu hỏi treo đã chốt bằng cách audit code thật (không phải suy
+  đoán)**: CCCD **KHÔNG bắt buộc** — đã LUÔN là vậy từ trước: `schema.
+  prisma` `cccd String?` (nullable), `UpdateProfileDto.cccd` có
+  `@IsOptional()`, `register/page.tsx` không hề thu thập CCCD lúc đăng ký.
+  CCCD chỉ được khai tự nguyện sau này qua `/profile`. Privacy Policy nói
+  đúng sự thật này, KHÔNG cần đổi code.
+- ✅ Thêm `frontend/src/components/Footer.tsx` (mới, gắn vào `layout.tsx`)
+  — trước đây dự án chưa từng có Footer, 3 trang mới sẽ bị orphan nếu
+  không có điều hướng.
 
 ### 4. Nhóm E — Sẵn sàng triển khai (cần quyết định hạ tầng trước)
 - ✅ **PayOS Webhook — ĐÃ SỬA bug thật + đã test đăng ký thành công qua ngrok

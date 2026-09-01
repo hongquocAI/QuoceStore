@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import AiChatWidget from "@/components/AiChatWidget";
 
 // ⚡ Nhóm G Đợt 1: đã bỏ `next/font/google` Inter — trước đây `inter.className`
@@ -36,7 +37,8 @@ export default function RootLayout({
             <div className="min-h-screen flex flex-col bg-[#f5f5f7]">
               <Header />
               <main className="flex-1">{children}</main>
-              
+              <Footer />
+
               <AiChatWidget />
             </div>
           </CartProvider>
