@@ -478,6 +478,17 @@ thẳng vào sửa dù đã biết rõ vấn đề ở G2):**
 ưu tiên sửa cụ thể cho từng trang/component — KHÔNG tự ý sửa hàng loạt khi
 chưa có danh sách đã duyệt.
 
+**G4 — Ghi nhận 2026-09-01, CHƯA làm (chờ Plan riêng được duyệt)**: người
+dùng nhận xét `/orders` (lịch sử đơn hàng) có vấn đề TỶ LỆ bố cục — khung mỗi
+đơn to nhưng nội dung quan trọng (sản phẩm, số tiền) hiện quá nhỏ so với
+khung, mất cân đối thị giác. Việc cần làm khi bắt tay vào: (a) audit lại
+`/orders` cụ thể, đề xuất bố cục ưu tiên làm nổi bật sản phẩm/số tiền/trạng
+thái thay vì để khoảng trắng/viền chiếm phần lớn diện tích; (b) rà soát các
+trang đã đổi style ở Đợt B/C (`profile`, `orders/lookup`, `change-password`,
+`cart`, `checkout`) xem có vấn đề tỷ lệ tương tự không; (c) xem xét có cần
+thêm trang "Chi tiết đơn hàng" riêng hay không — hiện `/orders` chỉ liệt kê
+tóm tắt, đối chiếu xem đã đủ thông tin hay cần trang mới.
+
 ### 3. Nhóm D — Pháp lý & Tuân thủ (BẮT BUỘC trước khi public thật)
 - Trang /privacy-policy: Chính sách bảo mật — BẮT BUỘC theo luật vì hệ thống
   thu thập CCCD (Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân VN)
@@ -488,6 +499,21 @@ chưa có danh sách đã duyệt.
   ràng nêu mục đích thu thập, thời gian lưu trữ, quyền của người dùng.
 
 ### 4. Nhóm E — Sẵn sàng triển khai (cần quyết định hạ tầng trước)
+- ⚠️ **PayOS Webhook CHƯA hoạt động trong dev — giới hạn hạ tầng, không phải
+  bug** (phát hiện 2026-09-01, đã verify kỹ, xem PROGRESS.md để biết cách
+  test đã dùng). `POST /payments/payos-webhook` (`payment.controller.ts`) đã
+  verify ĐÚNG 100% bằng mô phỏng webhook thật (chữ ký HMAC-SHA256 tạo bằng
+  chính crypto module của `@payos/node`) — cập nhật `Order.paymentStatus` +
+  ghi `PaymentTransaction` chính xác. Vấn đề là URL webhook chưa được đăng ký
+  với PayOS qua `payos.webhooks.confirm(webhookUrl)` (code hiện KHÔNG gọi
+  hàm này ở đâu cả — PayOS Dashboard là nơi duy nhất có thể đã cấu hình,
+  chưa xác nhận), và **PayOS không thể gọi tới `localhost` của máy dev**
+  (bước `confirm()` tự test URL trước khi đăng ký, sẽ fail với localhost).
+  **Trước khi go-live PHẢI**: (1) có domain public thật cho backend, (2)
+  gọi `payos.webhooks.confirm('https://<domain-thật>/payments/payos-webhook')`
+  1 lần (hoặc qua PayOS Dashboard) để đăng ký chính thức. **Test tạm trong
+  dev**: dùng `ngrok http 5000` lấy URL public tạm, đăng ký URL đó, quét QR
+  test lại — webhook thật sẽ tới được qua tunnel.
 - Người dùng CHƯA quyết định nền tảng deploy — cần hỏi lại: VPS riêng
   (DigitalOcean/Linode) hay PaaS (Vercel+Railway/Render)?
 - Tách config Dev/Staging/Production rõ ràng (.env.development,

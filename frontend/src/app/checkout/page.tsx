@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCart, getCartLineId } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { api, getApiErrorMessage } from '@/lib/api';
+import { QRCodeSVG } from 'qrcode.react';
 
 type PaymentMethod = 'COD' | 'BANK_TRANSFER';
 
@@ -186,7 +187,18 @@ export default function CheckoutPage() {
               {qrData && (
                 <div className="flex flex-col items-center gap-3">
                   <p className="text-xs font-medium text-gray-600">Quét mã để thanh toán qua ứng dụng ngân hàng</p>
-                  <img src={qrData.qrCode} alt="VietQR" className="w-56 h-56 object-contain border-2 border-black rounded-none p-2" />
+                  {/* 🛡️ FIX (lỗi có từ commit đầu tiên, không phải regression
+                      Đợt C): `qrData.qrCode` là CHUỖI DỮ LIỆU VietQR thô theo
+                      chuẩn EMVCo (xem @payos/node payment-requests.d.ts:93 —
+                      `qrCode: string`), KHÔNG PHẢI URL ảnh. Gán trực tiếp vào
+                      <img src> luôn vỡ ảnh vì đó không phải đường dẫn ảnh.
+                      Phải tự render chuỗi này thành ảnh QR ở phía client bằng
+                      thư viện qrcode.react (API đã đọc trực tiếp .d.ts, không
+                      đoán) — đúng cách PayOS Checkout page (link dự phòng)
+                      đang tự làm. */}
+                  <div className="border-2 border-black rounded-none p-3 bg-white">
+                    <QRCodeSVG value={qrData.qrCode} size={224} level="M" />
+                  </div>
                   <a
                     href={qrData.checkoutUrl}
                     target="_blank"

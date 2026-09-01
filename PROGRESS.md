@@ -70,9 +70,47 @@ khi chỉ muốn sửa field khác). Muốn hỗ trợ xóa hẳn cần thêm c�
 backend, ngoài phạm vi Frontend-only đã chốt cho đợt sửa này. Làm sau nếu
 người dùng thấy cần.
 
+**✅ 2 vấn đề nghiêm trọng VietQR (phát hiện qua test thật sau Đợt C) ĐÃ XỬ LÝ
+(2026-09-01):**
+
+- **Vấn đề 1 (ảnh QR vỡ trên checkout) — ĐÃ SỬA.** Xác nhận KHÔNG phải
+  regression Đợt C (đối chiếu `git diff` — Đợt C chỉ đổi className, dòng
+  `<img src={qrData.qrCode}>` có nguyên từ commit đầu tiên `8a8831d`). Root
+  cause: `qrCode` từ `@payos/node` là **chuỗi dữ liệu VietQR thô** (xem
+  `payment-requests.d.ts:93`, `qrCode: string`), không phải URL ảnh — gán
+  thẳng vào `<img src>` luôn vỡ. Đã thêm `qrcode.react@4.2.0` (lần đầu dùng
+  trong project, đã đọc `.d.ts` xác nhận API `QRCodeSVG({ value, size, level
+  })` trước khi dùng, không đoán), sửa `checkout/page.tsx` render đúng ảnh QR
+  từ chuỗi đó.
+- **Vấn đề 2 (paymentStatus không tự cập nhật sau khi quét QR thật) — XÁC
+  NHẬN là giới hạn hạ tầng dev, KHÔNG PHẢI bug code.** Đã verify kỹ bằng mô
+  phỏng webhook thật: viết script tạm dùng ĐÚNG crypto module của
+  `@payos/node` (`sort-obj-by-key.js` + `convert-obj-to-query-str.js`) để
+  tạo chữ ký HMAC-SHA256 hợp lệ bằng `PAYOS_CHECKSUM_KEY` thật, tạo 1 Order
+  test PENDING, gọi `POST /payments/payos-webhook` — kết quả **PASS 100%**:
+  verify chữ ký đúng, đối chiếu số tiền đúng, `paymentStatus` → `PAID`,
+  `PaymentTransaction` ghi đúng. Đã dọn sạch Order + PaymentTransaction test
+  ngay sau đó. Kết luận: code webhook hoàn toàn đúng — vấn đề là PayOS không
+  gọi tới được `localhost:5000` của máy dev, và code chưa từng gọi
+  `payos.webhooks.confirm(webhookUrl)` để đăng ký URL chính thức (grep xác
+  nhận). Đã ghi chi tiết + hướng khắc phục tạm (ngrok) + yêu cầu bắt buộc
+  trước go-live vào `CLAUDE.md` mục Nhóm E.
+- **Lưu ý phụ (không thuộc phạm vi 2 vấn đề trên, không cần hành động ngay)**:
+  trong lúc chạy script test, `dotenv@17.4.2` (bản đang cài) in ra 1 dòng tip
+  ngẫu nhiên nhắc tới domain `www.vestauth.com` ("⌁ auth for agents"). Đã xác
+  nhận dòng này nằm CỨNG trong mảng `TIPS` của chính `node_modules/dotenv/lib/
+  main.js` (không phải log lỗi hay bị chèn từ đâu khác) — không thực thi gì,
+  chỉ là 1 chuỗi quảng cáo random khi `dotenv.config()` chạy trong TTY. Không
+  phải bug của dự án, nhưng nếu thấy domain lạ trong log sau này, đây là lý
+  do (dotenv chính thức có in tip quảng cáo `dotenvx`/đối tác từ bản 16.x+).
+
 **⏳ Việc tiếp theo**: G3 (polish chi tiết) và G4 (feature gap — review sản
 phẩm, timeline đơn hàng, chọn item giỏ hàng riêng lẻ, sổ địa chỉ) theo đúng
 roadmap 4 đợt gốc trong `CLAUDE.md`, chưa bắt đầu.
+
+⚠️ **G4 MỚI ghi nhận (2026-09-01, chưa làm, chờ Plan riêng)**: `/orders` có
+vấn đề tỷ lệ bố cục (khung to, nội dung sản phẩm/số tiền hiện quá nhỏ) — chi
+tiết đầy đủ + phạm vi audit đã ghi trong `CLAUDE.md` mục Nhóm G, phần G4.
 
 **✅ Nhóm F (phần 1) — Discount thật vào `OrdersService.create()` ĐÃ XONG**
 (code + verify bằng request thật, dữ liệu test đã dọn sạch).
@@ -1296,3 +1334,76 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   quan trọng nhất là bài học `@IsOptional()` không bỏ qua chuỗi rỗng, áp
   dụng cho MỌI form gửi payload có field optional trong dự án, không riêng
   Profile. Đã ghi vào `CLAUDE.md` để không lặp lại ở form khác sau này.
+
+### [2026-09-01] Đã hoàn thành: Sửa Vấn đề 1 (ảnh QR vỡ) + Điều tra & xác nhận Vấn đề 2 (webhook PayOS) sau khi test VietQR thật
+
+- **Bối cảnh**: người dùng test luồng VietQR thật sau Đợt C, phát hiện 2 vấn
+  đề nghiêm trọng liên quan trực tiếp thanh toán/tiền — yêu cầu điều tra kỹ
+  trước khi sửa, đặc biệt KHÔNG tự ý sửa Vấn đề 2 cho tới khi xác nhận rõ
+  nguyên nhân (logic tiền bạc).
+- **Vấn đề 1 — Ảnh QR vỡ trên checkout**:
+  - Điều tra: `git diff 90c2254 7c9c485 -- frontend/src/app/checkout/page.tsx`
+    xác nhận Đợt C chỉ đổi `className` (màu viền/`rounded`), không đụng dòng
+    `<img src={qrData.qrCode}>`. Lùi tới `git show 8a8831d:...` (commit đầu
+    tiên của repo) — dòng này đã sai từ đó. **KHÔNG phải regression Đợt C.**
+  - Root cause: đọc `backend/node_modules/@payos/node/lib/resources/v2/
+    payment-requests/payment-requests.d.ts:93` — field `qrCode: string` là
+    **chuỗi dữ liệu VietQR thô (chuẩn EMVCo)**, không phải URL ảnh. PayOS
+    Checkout page (link dự phòng) tự render chuỗi này thành ảnh ở phía họ;
+    code Frontend chưa từng làm bước render này.
+  - Sửa: thêm `qrcode.react@4.2.0` vào `frontend/package.json` (lần đầu dùng
+    trong project — đã đọc `.d.ts` thật trong `node_modules/qrcode.react`
+    xác nhận API `<QRCodeSVG value={string} size level>` trước khi dùng,
+    đúng nguyên tắc CLAUDE.md không đoán API 3rd-party). Sửa
+    `frontend/src/app/checkout/page.tsx`: thay `<img src={qrData.qrCode}>`
+    bằng `<QRCodeSVG value={qrData.qrCode} size={224} level="M" />` bọc
+    trong khung `border-2 border-black` (khớp style vuông vức đã chốt).
+  - Test: `npx tsc --noEmit` sạch. Đã hỏi người dùng trước khi cài package
+    mới (theo CLAUDE.md mục "khi nào đề xuất đổi model" — tiêu chí #2 khớp),
+    người dùng xác nhận làm luôn trên model hiện tại.
+- **Vấn đề 2 — `paymentStatus` không tự cập nhật sau khi quét QR + trả tiền
+  thành công thật**:
+  - Người dùng đặt đúng câu hỏi cần xác nhận trước: cơ chế có dựa vào PayOS
+    webhook gọi ngược về backend không, và PayOS có gọi được tới `localhost`
+    của máy dev không.
+  - Verify webhook endpoint hoạt động đúng: viết script tạm
+    `backend/_test_webhook_simulation.js` (đã xóa ngay sau khi test) — dùng
+    ĐÚNG crypto module thật của `@payos/node`
+    (`lib/utils/sort-obj-by-key.js` + `convert-obj-to-query-str.js`, đọc
+    trực tiếp không đoán) để tạo chữ ký HMAC-SHA256 hợp lệ bằng
+    `PAYOS_CHECKSUM_KEY` thật trong `.env`. Tạo 1 Order test PENDING (qua
+    Prisma trực tiếp, cần 1 `userId` thật có sẵn vì FK bắt buộc), gọi
+    `POST http://localhost:5000/payments/payos-webhook` với payload
+    `code: '00'` khớp `orderCode`/`amount`. **Kết quả PASS**: HTTP 200,
+    `paymentStatus` → `PAID`, `PaymentTransaction` ghi đúng 1 bản ghi
+    `status: SUCCESS`. Dọn sạch Order + PaymentTransaction test ngay sau
+    (`prisma.paymentTransaction.deleteMany` + `prisma.order.delete`).
+  - Verify URL webhook chưa đăng ký đúng: đọc
+    `@payos/node/lib/resources/webhooks/webhook.d.ts` — PayOS yêu cầu gọi
+    `payos.webhooks.confirm(webhookUrl)` để đăng ký (PayOS tự gửi request
+    test tới URL đó trước khi chấp nhận). Grep `backend/src` xác nhận
+    **không có nơi nào gọi `confirm()`** — nếu có đăng ký thì chỉ có thể làm
+    thủ công qua PayOS Dashboard, và dù vậy PayOS vẫn không gọi tới được
+    `localhost` của máy dev.
+  - **Kết luận xác nhận đúng nghi ngờ của người dùng: giới hạn hạ tầng dev,
+    KHÔNG PHẢI bug code.** Không sửa code (đúng yêu cầu "không tự ý sửa cho
+    tới khi xác nhận rõ"). Đã ghi vào `CLAUDE.md` mục Nhóm E: yêu cầu bắt
+    buộc trước go-live (domain public + gọi `confirm()`), và cách test tạm
+    trong dev bằng `ngrok http 5000`.
+  - Ghi nhận thêm (không phải bug, chỉ để lưu lại nếu thấy log lạ sau này):
+    lúc chạy script test, `dotenv@17.4.2` in ra dòng tip ngẫu nhiên nhắc
+    `www.vestauth.com` — đã xác nhận chuỗi này nằm cứng trong mảng `TIPS`
+    của chính `node_modules/dotenv/lib/main.js` (dotenv chính thức có in
+    tip quảng cáo ngẫu nhiên từ bản 16.x+), không phải log lỗi hay bị chèn
+    từ nơi khác, không thực thi gì.
+- **File đã sửa**: `frontend/package.json`, `frontend/package-lock.json`
+  (thêm `qrcode.react`), `frontend/src/app/checkout/page.tsx`, `CLAUDE.md`
+  (mục Nhóm E — webhook; mục Nhóm G — thêm G4 ghi nhận vấn đề tỷ lệ bố cục
+  `/orders` người dùng phát hiện cùng lúc, CHƯA làm, chờ Plan riêng).
+- **Đã test**: `npx tsc --noEmit` sạch. Webhook verify bằng script mô phỏng
+  thật như trên (PASS, đã dọn sạch dữ liệu test). Ảnh QR — người dùng sẽ tự
+  test lại luồng VietQR thật để xác nhận hiển thị đúng sau fix.
+- **Lưu ý/vấn đề gặp phải**: không có vấn đề kỹ thuật ngoài dự kiến. Điểm
+  quan trọng nhất: PHẢI đọc `.d.ts` thật của `@payos/node` mới phát hiện
+  `qrCode` là string thô — nếu đoán theo tên field "qrCode" sẽ tự nhiên nghĩ
+  đó là URL ảnh, đúng bẫy CLAUDE.md đã cảnh báo về việc đoán API 3rd-party.
