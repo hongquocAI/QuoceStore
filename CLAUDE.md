@@ -499,21 +499,30 @@ tóm tắt, đối chiếu xem đã đủ thông tin hay cần trang mới.
   ràng nêu mục đích thu thập, thời gian lưu trữ, quyền của người dùng.
 
 ### 4. Nhóm E — Sẵn sàng triển khai (cần quyết định hạ tầng trước)
-- ⚠️ **PayOS Webhook CHƯA hoạt động trong dev — giới hạn hạ tầng, không phải
-  bug** (phát hiện 2026-09-01, đã verify kỹ, xem PROGRESS.md để biết cách
-  test đã dùng). `POST /payments/payos-webhook` (`payment.controller.ts`) đã
-  verify ĐÚNG 100% bằng mô phỏng webhook thật (chữ ký HMAC-SHA256 tạo bằng
-  chính crypto module của `@payos/node`) — cập nhật `Order.paymentStatus` +
-  ghi `PaymentTransaction` chính xác. Vấn đề là URL webhook chưa được đăng ký
-  với PayOS qua `payos.webhooks.confirm(webhookUrl)` (code hiện KHÔNG gọi
-  hàm này ở đâu cả — PayOS Dashboard là nơi duy nhất có thể đã cấu hình,
-  chưa xác nhận), và **PayOS không thể gọi tới `localhost` của máy dev**
-  (bước `confirm()` tự test URL trước khi đăng ký, sẽ fail với localhost).
-  **Trước khi go-live PHẢI**: (1) có domain public thật cho backend, (2)
-  gọi `payos.webhooks.confirm('https://<domain-thật>/payments/payos-webhook')`
-  1 lần (hoặc qua PayOS Dashboard) để đăng ký chính thức. **Test tạm trong
-  dev**: dùng `ngrok http 5000` lấy URL public tạm, đăng ký URL đó, quét QR
-  test lại — webhook thật sẽ tới được qua tunnel.
+- ✅ **PayOS Webhook — ĐÃ SỬA bug thật + đã test đăng ký thành công qua ngrok
+  (2026-09-02).** Ban đầu (2026-09-01) nghi ngờ chỉ là giới hạn hạ tầng
+  (PayOS không gọi tới được `localhost`) — ĐÚNG nhưng KHÔNG PHẢI toàn bộ câu
+  chuyện. Khi test thật bằng `ngrok http 5000` + gọi
+  `payos.webhooks.confirm(webhookUrl)` (PayOS Dashboard KHÔNG có ô nhập tay,
+  bắt buộc phải gọi API này để đăng ký), phát hiện **bug thật sẽ chặn
+  `confirm()` thất bại ở CẢ production**, không riêng dev: PayOS tự gửi 1
+  request test với `orderCode` GIẢ (cố định, không tồn tại trong bất kỳ DB
+  nào) để kiểm tra endpoint trước khi đăng ký. `PaymentService.handleWebhook()`
+  trước đây `throw NotFoundException` (404) khi không khớp đơn hàng nào —
+  PayOS coi non-2xx là "URL không hợp lệ" (`code: 20`) và từ chối đăng ký
+  thẳng, bất kể URL có domain thật hay ngrok. **Đã sửa**: khi không tìm thấy
+  order khớp `orderCode`, log cảnh báo + trả về 200 (đúng thực hành chuẩn
+  cho webhook — luôn xác nhận "đã nhận" bằng 2xx, không phản ánh lỗi nội bộ
+  qua mã lỗi HTTP), KHÔNG đụng logic đối chiếu tiền/cập nhật `paymentStatus`
+  (chỉ chạy khi order tồn tại, giữ nguyên). Sau fix, `confirm()` đăng ký
+  THÀNH CÔNG qua ngrok — người dùng đang test lại luồng quét QR thật để xác
+  nhận `/orders` tự cập nhật đúng.
+  **Trước khi go-live PHẢI**: có domain public thật cho backend, gọi lại
+  `payos.webhooks.confirm('https://<domain-thật>/payments/payos-webhook')`
+  1 lần để đăng ký chính thức (URL ngrok chỉ tồn tại tạm trong phiên test,
+  không lưu vào `.env`/code). **Test lại trong dev sau này**: `ngrok http
+  5000` lấy URL mới (free tier ngrok không giữ cố định giữa các lần chạy),
+  gọi `confirm()` lại với URL mới đó.
 - Người dùng CHƯA quyết định nền tảng deploy — cần hỏi lại: VPS riêng
   (DigitalOcean/Linode) hay PaaS (Vercel+Railway/Render)?
 - Tách config Dev/Staging/Production rõ ràng (.env.development,

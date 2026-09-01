@@ -82,19 +82,12 @@ người dùng thấy cần.
   trong project, đã đọc `.d.ts` xác nhận API `QRCodeSVG({ value, size, level
   })` trước khi dùng, không đoán), sửa `checkout/page.tsx` render đúng ảnh QR
   từ chuỗi đó.
-- **Vấn đề 2 (paymentStatus không tự cập nhật sau khi quét QR thật) — XÁC
-  NHẬN là giới hạn hạ tầng dev, KHÔNG PHẢI bug code.** Đã verify kỹ bằng mô
-  phỏng webhook thật: viết script tạm dùng ĐÚNG crypto module của
-  `@payos/node` (`sort-obj-by-key.js` + `convert-obj-to-query-str.js`) để
-  tạo chữ ký HMAC-SHA256 hợp lệ bằng `PAYOS_CHECKSUM_KEY` thật, tạo 1 Order
-  test PENDING, gọi `POST /payments/payos-webhook` — kết quả **PASS 100%**:
-  verify chữ ký đúng, đối chiếu số tiền đúng, `paymentStatus` → `PAID`,
-  `PaymentTransaction` ghi đúng. Đã dọn sạch Order + PaymentTransaction test
-  ngay sau đó. Kết luận: code webhook hoàn toàn đúng — vấn đề là PayOS không
-  gọi tới được `localhost:5000` của máy dev, và code chưa từng gọi
-  `payos.webhooks.confirm(webhookUrl)` để đăng ký URL chính thức (grep xác
-  nhận). Đã ghi chi tiết + hướng khắc phục tạm (ngrok) + yêu cầu bắt buộc
-  trước go-live vào `CLAUDE.md` mục Nhóm E.
+- **Vấn đề 2 (paymentStatus không tự cập nhật sau khi quét QR thật) —
+  BAN ĐẦU nghi giới hạn hạ tầng, sau test bằng ngrok phát hiện thêm 1 BUG
+  THẬT, đã sửa. Xem đầy đủ ở entry Nhật ký `[2026-09-02]` bên dưới** (test
+  `confirm()` qua ngrok lộ ra: webhook 404 khi PayOS gửi request test với
+  `orderCode` giả lúc đăng ký — sẽ chặn `confirm()` ở CẢ production, không
+  chỉ dev). Đã sửa `payment.service.ts`, `confirm()` đăng ký thành công.
 - **Lưu ý phụ (không thuộc phạm vi 2 vấn đề trên, không cần hành động ngay)**:
   trong lúc chạy script test, `dotenv@17.4.2` (bản đang cài) in ra 1 dòng tip
   ngẫu nhiên nhắc tới domain `www.vestauth.com` ("⌁ auth for agents"). Đã xác
@@ -1407,3 +1400,72 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   quan trọng nhất: PHẢI đọc `.d.ts` thật của `@payos/node` mới phát hiện
   `qrCode` là string thô — nếu đoán theo tên field "qrCode" sẽ tự nhiên nghĩ
   đó là URL ảnh, đúng bẫy CLAUDE.md đã cảnh báo về việc đoán API 3rd-party.
+
+### [2026-09-02] Đã hoàn thành: Test webhook PayOS qua ngrok thật → phát hiện + sửa bug 404 chặn payos.webhooks.confirm()
+
+- **Bối cảnh**: người dùng tự test VietQR thật sau fix ảnh QR (entry
+  `[2026-09-01]` phía trên) — quét mã, chuyển khoản thành công qua app ngân
+  hàng thật, nhưng `/orders` vẫn "chưa thanh toán". Đúng như kết luận trước
+  đó (giới hạn hạ tầng dev). Người dùng muốn tự mắt xác nhận bằng ngrok, hỏi
+  route webhook đầy đủ + có cần bước code/config nào khác không.
+- **Phát hiện quan trọng**: PayOS Dashboard KHÔNG có ô nhập tay URL webhook —
+  bắt buộc phải gọi `payos.webhooks.confirm(webhookUrl)` (API có sẵn trong
+  `@payos/node`, xem `webhook.d.ts`) để đăng ký. Đây là thông tin MỚI so với
+  entry trước, đổi hẳn cách tiếp cận.
+- **Quá trình chạy `confirm()` qua `ngrok http 5000`** (script tạm
+  `backend/_confirm_webhook_temp.js`, tạo/chạy/xóa nhiều lần theo đúng
+  nguyên tắc dọn dẹp — không giữ lại sau mỗi lần chạy):
+  1. Lần 1: lỗi `Webhook url invalid (code: 20)` — kiểm tra bằng `curl` phát
+     hiện ngrok trả `ERR_NGROK_8012` (tunnel sống nhưng backend
+     `localhost:5000` không chạy — do trùng lúc backend đang tắt).
+  2. Lần 2 (sau khi người dùng khởi động lại backend, xác nhận `/health`
+     200): vẫn lỗi y hệt — kiểm tra lại `curl` phát hiện `ERR_NGROK_3200`
+     ("endpoint is offline") — tunnel ngrok chính nó đã bị đóng/hết phiên,
+     không liên quan backend.
+  3. Lần 3 (sau khi người dùng mở lại ngrok): vẫn lỗi `code: 20` y hệt, dù
+     `curl` trực tiếp qua tunnel giờ trả 400 hợp lệ (route sống, chỉ thiếu
+     chữ ký vì tôi tự gửi body rỗng để test). Nghi ngờ chuyển sang chính
+     logic webhook, không phải hạ tầng nữa.
+  4. Đọc **ngrok Web Inspector** (`http://localhost:4040/api/requests/http`
+     — API cục bộ của ngrok, ghi lại đúng request PayOS gửi + response thật
+     backend trả) — thấy rõ: PayOS gửi payload test với `data.orderCode:
+     123` (giá trị cố định PayOS dùng để kiểm tra mọi endpoint, không tồn
+     tại trong DB của ai), chữ ký hợp lệ, nhưng backend trả **404**.
+- **Root cause thật**: `PaymentService.handleWebhook()`
+  (`backend/src/payment/payment.service.ts:133-136`) — khi không tìm thấy
+  `Order` khớp `orderCode`, `throw new NotFoundException(...)` → 404. PayOS
+  coi non-2xx là "URL không hợp lệ", từ chối đăng ký. **Bug này chặn
+  `confirm()` thất bại ở CẢ production** (domain thật cũng nhận đúng payload
+  test này và cũng 404) — không phải giới hạn hạ tầng dev thuần túy như kết
+  luận ban đầu ngày 2026-09-01.
+- **Đã hỏi xác nhận người dùng trước khi sửa** (đúng yêu cầu — logic tiền
+  bạc, không tự ý động vào). Người dùng xác nhận sửa ngay.
+- **File đã sửa**: `backend/src/payment/payment.service.ts` — nhánh
+  `if (!order)` trong `handleWebhook()` đổi từ `throw NotFoundException`
+  sang `this.logger.warn(...)` + `return { success: true, message: ... }`
+  (200). Không đụng logic đối chiếu số tiền/cập nhật `paymentStatus`/ghi
+  `PaymentTransaction` — các bước đó chỉ chạy khi `order` tồn tại, y nguyên.
+  `NotFoundException` vẫn dùng ở `createPaymentLink()` (dòng 49), import
+  không bị dư.
+- **Đã test**: `npx tsc --noEmit` sạch. Chạy lại `confirm()` sau khi backend
+  hot-reload — **thành công**:
+  ```
+  ✅ Đăng ký thành công: { webhookUrl: '...', accountName: 'LE HONG QUOC',
+     accountNumber: '...', name: 'QuoceStore', shortName: 'MBBank' }
+  ```
+  Script tạm đã xóa ngay sau mỗi lần chạy (4 lần tổng cộng qua cả quá trình
+  debug), `git status` xác nhận sạch, không sót file test. URL ngrok dùng để
+  test KHÔNG lưu vào `.env`/code (chỉ tồn tại trong phiên ngrok của người
+  dùng, theo đúng yêu cầu).
+- **File đã sửa (docs)**: `CLAUDE.md` mục Nhóm E — cập nhật lại kết luận
+  Vấn đề 2 (không còn là "giới hạn hạ tầng thuần túy", có bug thật đã sửa),
+  ghi rõ yêu cầu bắt buộc trước go-live (gọi lại `confirm()` với domain
+  thật) và cách test lại trong dev sau này (ngrok URL đổi mỗi lần chạy lại
+  ở free tier, cần `confirm()` lại).
+- **Lưu ý/vấn đề gặp phải**: đa số thời gian debug là loại trừ hạ tầng
+  (backend tắt, tunnel ngrok tắt) trước khi chạm tới bug thật — bài học: khi
+  1 lỗi 3rd-party lặp lại y hệt sau khi đã "sửa" điều kiện tưởng là nguyên
+  nhân, phải xác minh lại TỪNG lớp (tunnel sống? backend sống? route trả gì
+  thật?) bằng công cụ quan sát trực tiếp (ngrok Web Inspector) thay vì đoán
+  tiếp — đọc log summary của lỗi (`err.message`) không đủ, phải xem request/
+  response THẬT mới lộ ra payload test `orderCode: 123` của PayOS.

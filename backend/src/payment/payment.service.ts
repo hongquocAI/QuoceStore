@@ -132,7 +132,23 @@ export class PaymentService {
 
     const order = await this.prisma.order.findUnique({ where: { orderCode } });
     if (!order) {
-      throw new NotFoundException(`Không tìm thấy đơn hàng mã ${orderCode}`);
+      // 🛡️ FIX (phát hiện 2026-09-02 khi test payos.webhooks.confirm() qua
+      // ngrok): trước đây throw NotFoundException (404) ở đây — nhưng
+      // payos.webhooks.confirm() (bắt buộc phải gọi để đăng ký URL webhook,
+      // PayOS Dashboard không có ô nhập tay) tự gửi 1 request test với
+      // orderCode GIẢ (cố định, không tồn tại trong DB của bất kỳ ai) để
+      // kiểm tra endpoint. PayOS coi non-2xx là "URL không hợp lệ" và từ
+      // chối đăng ký — bug này chặn confirm() thất bại ở CẢ dev lẫn
+      // production, không chỉ vấn đề ngrok. Theo đúng thực hành chuẩn cho
+      // webhook (luôn trả 2xx để xác nhận "đã nhận", không phản ánh lỗi nội
+      // bộ qua mã lỗi HTTP), đổi sang log cảnh báo + trả 200 thay vì 404.
+      // Không ảnh hưởng logic đối chiếu tiền/cập nhật paymentStatus — các
+      // bước đó chỉ chạy khi order tồn tại, giữ nguyên bên dưới.
+      this.logger.warn(
+        `Webhook PayOS báo orderCode ${orderCode} nhưng không khớp đơn hàng nào trong DB ` +
+          `(có thể là request test của payos.webhooks.confirm() hoặc dữ liệu không đồng bộ).`,
+      );
+      return { success: true, message: 'Đã nhận webhook, nhưng không tìm thấy đơn hàng khớp mã này.' };
     }
 
     // 🛡️ FIX #6 (QUAN TRỌNG): Đối chiếu số tiền webhook báo về với đơn hàng thật.
