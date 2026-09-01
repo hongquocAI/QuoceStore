@@ -75,6 +75,18 @@ export class OrdersController {
     return this.ordersService.updateShippingStatus(id, dto);
   }
 
+  // ⚡ Polling nhẹ cho checkout.tsx (Hướng B): PUBLIC có chủ đích, khác hẳn
+  // route :id bên dưới — chỉ trả ĐÚNG paymentStatus, không kèm tên/SĐT/địa
+  // chỉ/số tiền nào. An toàn vì key bằng Order.id (UUID v4 ngẫu nhiên, xem
+  // schema.prisma `@default(uuid())`), không đoán/liệt kê được — khác
+  // orderCode là số nguyên tuần tự. Cần PUBLIC vì Guest checkout không có
+  // JWT để dùng GET /orders/:id. Đặt TRƯỚC :id để rõ ràng khi đọc code (dù
+  // không xung đột thật vì khác số segment path).
+  @Get(':id/status')
+  async getPaymentStatus(@Param('id') id: string) {
+    return this.ordersService.getPaymentStatus(id);
+  }
+
   // 🛡️ FIX: Trước đây PUBLIC hoàn toàn -> lộ tên, SĐT, địa chỉ của bất kỳ
   // khách hàng nào cho bất kỳ ai đoán được ID đơn hàng. Giờ bắt buộc đăng
   // nhập, và Service sẽ kiểm tra chỉ chủ đơn hàng hoặc ADMIN mới xem được.

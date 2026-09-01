@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { Order, ShippingStatus } from '@/types';
 import { PAYMENT_STATUS_LABEL, SHIPPING_STATUS_LABEL } from '@/lib/orderLabels';
+import ConfirmModal from '@/components/common/ConfirmModal';
 
 const SHIPPING_STATUS_BADGE: Record<ShippingStatus, string> = {
   PENDING: 'bg-gray-100 text-gray-700',
@@ -44,6 +45,7 @@ export default function AdminOrdersPage() {
   const itemsPerPage = 20;
 
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ order: Order; nextStatus: ShippingStatus; message: string } | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,7 +95,10 @@ export default function AdminOrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleUpdateStatus = async (order: Order, nextStatus: ShippingStatus) => {
+  // ⚡ Nhóm G: tách khỏi window.confirm() — build message rồi lưu vào state
+  // `confirmAction` để ConfirmModal hiển thị, người dùng bấm Xác nhận mới
+  // thực sự gọi handleUpdateStatus() bên dưới.
+  const requestUpdateStatus = (order: Order, nextStatus: ShippingStatus) => {
     // ⚠️ GIỚI HẠN QUAN TRỌNG: hệ thống CHỈ tự động hoàn kho khi hủy đơn,
     // TUYỆT ĐỐI KHÔNG tự động hoàn tiền qua PayOS dù đơn đã thanh toán.
     // Phải cảnh báo rõ để Admin không hiểu nhầm hủy xong là khách tự động
@@ -108,8 +113,10 @@ export default function AdminOrdersPage() {
           'KHÔNG tự động hoàn tiền cho khách — bạn cần tự hoàn tiền thủ công qua PayOS Dashboard.';
       }
     }
-    if (!window.confirm(confirmMessage)) return;
+    setConfirmAction({ order, nextStatus, message: confirmMessage });
+  };
 
+  const handleUpdateStatus = async (order: Order, nextStatus: ShippingStatus) => {
     try {
       setUpdatingId(order.id);
       await api.patch(`/orders/${order.id}/shipping-status`, { shippingStatus: nextStatus });
@@ -227,7 +234,7 @@ export default function AdminOrdersPage() {
                           <button
                             key={next}
                             disabled={updatingId === order.id}
-                            onClick={() => handleUpdateStatus(order, next)}
+                            onClick={() => requestUpdateStatus(order, next)}
                             className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-none transition border disabled:opacity-40 ${
                               next === 'CANCELLED'
                                 ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white'
@@ -316,6 +323,19 @@ export default function AdminOrdersPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmAction}
+        title={confirmAction?.nextStatus === 'CANCELLED' ? 'Xác nhận hủy đơn' : 'Xác nhận đổi trạng thái'}
+        message={confirmAction?.message ?? ''}
+        danger={confirmAction?.nextStatus === 'CANCELLED'}
+        confirmLabel={confirmAction?.nextStatus === 'CANCELLED' ? 'Hủy đơn' : 'Xác nhận'}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          if (confirmAction) handleUpdateStatus(confirmAction.order, confirmAction.nextStatus);
+          setConfirmAction(null);
+        }}
+      />
     </div>
   );
 }

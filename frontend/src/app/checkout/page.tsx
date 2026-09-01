@@ -28,6 +28,13 @@ export default function CheckoutPage() {
   const [qrData, setQrData] = useState<{ qrCode: string; checkoutUrl: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
 
+  // ⚡ Hướng B (2026-09-02): polling nhẹ trạng thái thanh toán VietQR — để
+  // trang tự chuyển "Thanh toán thành công!" ngay khi webhook xác nhận
+  // PAID, không cần rời trang/F5. `livePaymentStatus` khởi đầu null (chưa
+  // biết gì mới hơn lúc tạo đơn), chỉ set khi API trả về khác PENDING.
+  const [livePaymentStatus, setLivePaymentStatus] = useState<string | null>(null);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
+
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   // ⚡ Nhóm F: mã giảm giá mang từ trang giỏ hàng sang qua sessionStorage
@@ -139,6 +146,39 @@ export default function CheckoutPage() {
     }
   };
 
+  // ⚡ Hướng B: polling nhẹ — chỉ chạy khi VietQR còn PENDING. Dừng khi
+  // paymentStatus đổi (PAID/FAILED/CANCELLED), hết 10 phút, hoặc unmount
+  // (cleanup clearInterval, tránh rò rỉ interval chạy ngầm).
+  useEffect(() => {
+    if (!orderResult || paymentMethod !== 'BANK_TRANSFER') return;
+    if (orderResult.paymentStatus !== 'PENDING') return;
+
+    const POLL_INTERVAL_MS = 4000;
+    const MAX_DURATION_MS = 10 * 60 * 1000;
+    const startedAt = Date.now();
+
+    const interval = setInterval(async () => {
+      if (Date.now() - startedAt > MAX_DURATION_MS) {
+        clearInterval(interval);
+        setPollTimedOut(true);
+        return;
+      }
+      try {
+        const res = await api.get(`/orders/${orderResult.id}/status`);
+        const status = res.data.data.paymentStatus;
+        if (status !== 'PENDING') {
+          setLivePaymentStatus(status);
+          clearInterval(interval);
+        }
+      } catch {
+        // Lỗi mạng tạm thời (mất mạng, tunnel dev chập chờn...) — bỏ qua,
+        // thử lại ở lượt poll sau, không báo lỗi cho khách.
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [orderResult, paymentMethod]);
+
   // ── Màn hình xác nhận sau khi đặt hàng thành công ──────────────────
   if (orderResult) {
     return (
@@ -147,8 +187,10 @@ export default function CheckoutPage() {
           {/* 🛡️ Hướng B (2026-09-02): VietQR chỉ THỰC SỰ thành công khi
               webhook xác nhận PAID (tiền đã về) — đơn lúc này vẫn PENDING,
               tồn kho CHƯA bị trừ (xem OrdersService.create()). Không dùng
-              chữ "thành công" cho tới lúc đó, tránh hiểu nhầm là đã xong. */}
-          {paymentMethod === 'BANK_TRANSFER' ? (
+              chữ "thành công" cho tới lúc đó, tránh hiểu nhầm là đã xong.
+              `livePaymentStatus` (polling) tự chuyển UI này sang khối ✓
+              ngay khi PAID, không cần rời trang. */}
+          {paymentMethod === 'BANK_TRANSFER' && livePaymentStatus !== 'PAID' ? (
             <>
               <div className="w-16 h-16 border-2 border-black flex items-center justify-center mx-auto mb-6">
                 <span className="text-black text-2xl font-black">⏳</span>
@@ -159,13 +201,20 @@ export default function CheckoutPage() {
               <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
                 Vui lòng quét mã để hoàn tất thanh toán
               </p>
+              {(livePaymentStatus === 'FAILED' || livePaymentStatus === 'CANCELLED') && (
+                <p className="text-[11px] font-bold uppercase tracking-wide text-red-600 mb-2">
+                  Thanh toán không thành công, vui lòng liên hệ hỗ trợ.
+                </p>
+              )}
             </>
           ) : (
             <>
               <div className="w-16 h-16 bg-black flex items-center justify-center mx-auto mb-6">
                 <span className="text-white text-2xl font-black">✓</span>
               </div>
-              <h1 className="text-2xl font-black uppercase tracking-[0.2em] text-gray-900 mb-2">Đặt hàng thành công!</h1>
+              <h1 className="text-2xl font-black uppercase tracking-[0.2em] text-gray-900 mb-2">
+                {paymentMethod === 'BANK_TRANSFER' ? 'Thanh toán thành công!' : 'Đặt hàng thành công!'}
+              </h1>
             </>
           )}
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-6">
@@ -201,7 +250,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {paymentMethod === 'BANK_TRANSFER' && (
+          {paymentMethod === 'BANK_TRANSFER' && livePaymentStatus !== 'PAID' && (
             <div className="mb-6">
               {qrLoading && <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Đang tạo mã QR thanh toán...</p>}
               {qrData && (
@@ -228,6 +277,12 @@ export default function CheckoutPage() {
                     Hoặc mở link thanh toán
                   </a>
                   <p className="text-[11px] text-gray-400">Trạng thái đơn hàng sẽ tự động cập nhật sau khi thanh toán.</p>
+                  {pollTimedOut && (
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600">
+                      Chưa nhận được xác nhận thanh toán. Vui lòng kiểm tra lại ở{' '}
+                      <Link href="/orders" className="underline">/orders</Link> sau.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

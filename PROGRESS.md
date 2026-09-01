@@ -18,6 +18,33 @@
 
 ### Đang làm / Việc tiếp theo ngay
 
+**✅ 2 việc UX sau "Hướng B" ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02), người dùng test
+PASS toàn bộ:**
+
+- **Việc A — Checkout tự động cập nhật trạng thái thanh toán (polling).**
+  Endpoint mới `GET /orders/:id/status` (PUBLIC có chủ đích, key bằng
+  `Order.id` — UUID v4 không đoán/liệt kê được, khác `orderCode` là số
+  nguyên tuần tự; response CHỈ `{ paymentStatus }`, dùng `select` ở Prisma
+  nên không có nguy cơ lộ field khác kể cả khi Order thêm cột mới sau này).
+  `checkout/page.tsx`: `useEffect` poll mỗi 4s khi VietQR còn PENDING, dừng
+  khi đổi trạng thái / quá 10 phút (hiện gợi ý kiểm tra lại ở `/orders`) /
+  unmount (cleanup `clearInterval`). Khi phát hiện `PAID`, UI tự chuyển
+  sang khối "✓ Thanh toán thành công!" (tái dùng đúng style khối COD), ẩn
+  QR. File: `backend/src/orders/orders.controller.ts`,
+  `backend/src/orders/orders.service.ts` (method `getPaymentStatus`),
+  `frontend/src/app/checkout/page.tsx`.
+- **Việc B — `ConfirmModal` dùng chung thay `window.confirm()`.** Component
+  mới `frontend/src/components/common/ConfirmModal.tsx` (props: `open`,
+  `title`, `message`, `confirmLabel?`, `cancelLabel?`, `danger?`,
+  `onConfirm`, `onCancel`; `z-[70]` cố định để luôn nổi trên mọi modal khác
+  trong dự án), theo đúng pattern modal vuông vức đã có
+  (`admin/products/page.tsx` mini-modal quick-add). `admin/orders/page.tsx`:
+  tách `handleUpdateStatus` thành `requestUpdateStatus` (build message, mở
+  modal) + `handleUpdateStatus` (chỉ còn phần gọi API) — thay đúng 1 chỗ
+  gọi `window.confirm()` duy nhất trong file, không đổi logic nghiệp vụ.
+
+**⏳ Việc tiếp theo**: chưa có việc mới nào được chốt — chờ người dùng.
+
 **✅ "Hướng B" — Tách trừ kho VietQR khỏi lúc tạo đơn, chuyển sang lúc
 webhook xác nhận PAID ĐÃ ĐÓNG HOÀN TOÀN (2026-09-02), người dùng test PASS
 đầu-cuối thật qua ngrok.** Lỗ hổng nghiệp vụ đã sửa: trước đây
@@ -42,13 +69,6 @@ orders.service.ts`, `backend/src/payment/payment.service.ts`,
 `frontend/src/app/checkout/page.tsx`, `frontend/src/app/orders/page.tsx`,
 `frontend/src/app/orders/lookup/page.tsx`, `frontend/src/lib/
 orderLabels.ts` (thêm `getPaymentStatusDisplay()` dùng chung).
-
-**⏳ Tiếp theo (đang làm)**: 2 việc UX liên quan — (A) polling nhẹ ở
-checkout để tự cập nhật "Thanh toán thành công!" không cần rời trang, key
-bằng `Order.id` (UUID) qua endpoint mới `GET /orders/:id/status` (public,
-chỉ trả `paymentStatus`, không PII); (B) `ConfirmModal` dùng chung
-(`components/common/ConfirmModal.tsx`) thay `window.confirm()` ở
-`admin/orders/page.tsx`.
 
 **✅ Nhóm G — ĐẢO NGƯỢC thiết kế + 2 bug ĐÃ ĐÓNG HOÀN TOÀN (2026-09-01).**
 Người dùng xem trực tiếp kết quả Đợt 3 cũ (bo góc mềm, nền `#fafafc`,
@@ -1557,3 +1577,65 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   ngay qua `tsc --noEmit` (4 lỗi `Cannot find name 'isSuccess'`) — bài học:
   luôn chạy `tsc --noEmit` ngay sau mỗi lần sửa khối code lớn, không dồn
   nhiều thay đổi rồi mới kiểm tra 1 lần.
+
+### [2026-09-02] Đã hoàn thành: Việc A (polling checkout) + Việc B (ConfirmModal thay window.confirm())
+
+- **Bối cảnh**: 2 cải thiện UX phát sinh ngay sau "Hướng B" — checkout chỉ
+  render 1 lần, không tự biết khi nào webhook xác nhận PAID; `admin/
+  orders/page.tsx` dùng `window.confirm()` thô, lệch style Nhóm G. Cả 2
+  đụng kiến trúc (endpoint mới, component dùng chung mới) nên vào Plan Mode
+  trước khi code, có 1 câu hỏi bảo mật người dùng chủ động đặt ra (endpoint
+  polling public có an toàn không) đã trả lời trong Plan trước khi code.
+- **Việc A — File đã sửa**:
+  - `backend/src/orders/orders.controller.ts` — route mới
+    `GET /orders/:id/status` (PUBLIC, đặt trước `@Get(':id')` cho dễ đọc dù
+    không xung đột path thật).
+  - `backend/src/orders/orders.service.ts` — method mới `getPaymentStatus(id)`:
+    `prisma.order.findUnique({ where: { id }, select: { paymentStatus: true } })`,
+    404 nếu không tìm thấy. `select` đảm bảo chỉ đúng 1 field được trả về.
+  - `frontend/src/app/checkout/page.tsx` — thêm state `livePaymentStatus`,
+    `pollTimedOut`; `useEffect` poll `GET /orders/:id/status` mỗi 4000ms khi
+    `paymentMethod === 'BANK_TRANSFER' && orderResult.paymentStatus ===
+    'PENDING'`, dừng khi status đổi khác PENDING (`clearInterval` +
+    `setLivePaymentStatus`) hoặc quá `MAX_DURATION_MS = 10 phút` (
+    `setPollTimedOut(true)`); cleanup `return () => clearInterval(interval)`
+    chống rò rỉ khi unmount. JSX: `paymentMethod === 'BANK_TRANSFER' &&
+    livePaymentStatus !== 'PAID'` quyết định hiện khối ⏳ hay khối ✓ (khối ✓
+    dùng chung với COD, chỉ đổi text "Thanh toán thành công!" vs "Đặt hàng
+    thành công!"); khối QR tự ẩn khi đã `PAID`; thêm dòng cảnh báo đỏ khi
+    `livePaymentStatus` là `FAILED`/`CANCELLED`, dòng amber khi
+    `pollTimedOut` (gợi ý kiểm tra lại ở `/orders`).
+  - **Quyết định bảo mật (đã trình bày trong Plan, người dùng duyệt)**: key
+    polling bằng `Order.id` (UUID v4 ngẫu nhiên, `@default(uuid())`) chứ
+    KHÔNG PHẢI `orderCode` (số nguyên tuần tự, dò được) — cùng bản chất
+    "capability token qua URL xác nhận đơn hàng" đã phổ biến ở e-commerce.
+    Response chỉ lộ đúng `paymentStatus`, không PII. Không thêm `@Throttle`
+    riêng — global default (100 req/phút/IP, `app.module.ts:49-55`) đã đủ
+    cho tần suất poll 4s/lần, và vì key không đoán được, throttle chặt hơn
+    không thêm giá trị bảo mật thật.
+- **Việc B — File đã sửa**:
+  - `frontend/src/components/common/ConfirmModal.tsx` (MỚI) — component
+    thuần, props `open/title/message/confirmLabel?/cancelLabel?/danger?/
+    onConfirm/onCancel`; `if (!open) return null` (caller luôn mount, không
+    cần gói điều kiện ở nơi gọi); `z-[70]` cố định (cao hơn `z-50`/`z-[60]`
+    đang dùng ở các modal khác trong dự án — luôn nổi trên cùng dù gọi từ
+    trong 1 modal khác sau này, không cần prop z-index tùy biến); style
+    đúng pattern mini-modal quick-add có sẵn (`admin/products/page.tsx`).
+  - `frontend/src/app/admin/orders/page.tsx` — thêm state `confirmAction`;
+    tách `handleUpdateStatus` cũ thành `requestUpdateStatus` (build đúng
+    `confirmMessage` nhiều dòng như code cũ, không đổi câu chữ, lưu vào
+    `confirmAction` thay vì gọi `window.confirm()`) và `handleUpdateStatus`
+    (chỉ còn phần gọi API + side effect, bỏ dòng gate `window.confirm`).
+    Đổi `onClick` nút hành động sang `requestUpdateStatus`. Render
+    `<ConfirmModal>` cuối JSX, `danger`/`confirmLabel` đổi theo
+    `nextStatus === 'CANCELLED'`.
+- **Đã test**: `npx tsc --noEmit` sạch cả 2 phía sau mỗi bước. Backend hot-
+  reload xác nhận `/health` 200 sau khi thêm route. Người dùng test PASS
+  toàn bộ: Việc A quét mã thật qua ngrok → UI tự chuyển "Thanh toán thành
+  công!" trong vài giây không cần rời trang, xác nhận `GET /orders/:id/
+  status` chỉ trả `paymentStatus`; Việc B đổi trạng thái đơn thường + đơn
+  PAID → modal vuông vức hiện đúng thay hộp thoại trình duyệt, Hủy/Xác nhận
+  hoạt động đúng, không đổi hành vi API.
+- **Lưu ý/vấn đề gặp phải**: người dùng từng báo nghi ngờ có bug ở lượt test
+  đầu, sau xác nhận lại là hiểu nhầm thao tác test (không phải bug code) —
+  không có thay đổi code nào phát sinh từ việc này, chỉ xác nhận lại PASS.

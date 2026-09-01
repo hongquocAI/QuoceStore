@@ -255,6 +255,19 @@ export class OrdersService {
     return { success: true, data: orders };
   }
 
+  // ⚡ Hướng B: polling nhẹ cho checkout.tsx — CHỈ select đúng 1 field, ngay
+  // cả khi Order thêm cột mới sau này cũng không có nguy cơ lộ thừa.
+  async getPaymentStatus(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: { paymentStatus: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng.');
+    }
+    return { success: true, data: { paymentStatus: order.paymentStatus } };
+  }
+
   async findOneForUser(id: string, requestingUser: { id: string; role: string }) {
     const order = await this.prisma.order.findUnique({
       where: { id },
