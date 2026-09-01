@@ -30,3 +30,6 @@ docker-compose.override.yml
 # Archive tạm của PROGRESS.md khi bị cắt gọn (xem quy tắc trong PROGRESS.md)
 # — vẫn commit bình thường, KHÔNG ignore, dòng này chỉ để ghi chú rõ chủ đích
 # PROGRESS_ARCHIVE.md không bị bỏ sót ngoài ý muốn.
+
+frontend/AGENTS.md
+frontend/CLAUDE.md

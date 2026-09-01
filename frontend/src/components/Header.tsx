@@ -24,6 +24,12 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-[#111] antialiased">
           <Link href="/" className="hover:text-gray-500 transition">Cửa hàng</Link>
           <Link href="/accessories" className="hover:text-gray-500 transition">Phụ kiện</Link>
+          {/* ⚡ Chỉ hiện khi CHƯA đăng nhập — đây là tính năng dành cho khách
+              vãng lai (Guest Order Lookup), user đã đăng nhập có sẵn "Đơn
+              hàng của tôi" trong dropdown, không cần lặp lại ở đây. */}
+          {!user && (
+            <Link href="/orders/lookup" className="hover:text-gray-500 transition">Tra cứu đơn</Link>
+          )}
         </nav>
 
         {/* GIỎ HÀNG & TÀI KHOẢN */}
@@ -88,14 +94,28 @@ export default function Header() {
                   >
                     Hồ sơ cá nhân
                   </Link>
-                  <Link 
-                    href="/orders" 
+                  <Link
+                    href="/orders"
                     className="block px-4 py-2.5 text-gray-800 hover:bg-gray-100 transition"
                     onClick={() => setDropdownOpen(false)}
                   >
                     Đơn hàng của tôi
                   </Link>
-                  <button 
+                  <Link
+                    href="/orders/lookup"
+                    className="block px-4 py-2.5 text-gray-800 hover:bg-gray-100 transition"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Tra cứu đơn hàng
+                  </Link>
+                  <Link
+                    href="/change-password"
+                    className="block px-4 py-2.5 text-gray-800 hover:bg-gray-100 transition"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Đổi mật khẩu
+                  </Link>
+                  <button
                     onClick={logout}
                     className="w-full text-left px-4 py-2.5 text-red-600 hover:bg-red-50 transition border-t border-gray-100 mt-1"
                   >

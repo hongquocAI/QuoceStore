@@ -65,3 +65,13 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+// 🛡️ FIX: ValidationPipe trả `message` dạng MẢNG string khi có nhiều lỗi
+// validate cùng lúc (VD sai cả CCCD lẫn SĐT) — đổ thẳng mảng vào JSX khiến
+// React nối các phần tử liền nhau không dấu phân cách, ra 1 chuỗi lỗi dính
+// cục khó đọc. Hàm này chuẩn hóa về 1 string, mỗi lỗi 1 dòng.
+export function getApiErrorMessage(err: any, fallback: string): string {
+  const message = err?.response?.data?.message;
+  if (Array.isArray(message)) return message.join('\n');
+  return message || err?.message || fallback;
+}

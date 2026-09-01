@@ -404,13 +404,44 @@ làm TRƯỚC Nhóm D (pháp lý) và Nhóm E (deploy production thật)** — v
 diện là thứ người xem GitHub/demo chạm vào đầu tiên, còn pháp lý/deploy
 thật chỉ cần thiết khi thật sự kinh doanh.
 
-**Định hướng thiết kế đã CHỐT — KHÔNG ép toàn bộ site về 1 style duy nhất.**
-Giữ nguyên 2 "gia đình" style đã hình thành tự nhiên và hợp lý:
-- **Storefront/Marketing** (Home, Accessories, Product listing, Login): tối
-  giản, đen-trắng tương phản mạnh, chữ đậm in hoa, viền vuông sắc nét
-  (`border-2`, `rounded-none`).
-- **Account/Giao dịch** (Cart, Checkout, Profile, Orders): nền `#fafafc`
-  dịu, thẻ bo góc mềm (`rounded-2xl`/`rounded-3xl`), tông màu ấm hơn.
+**Định hướng thiết kế đã CHỐT (ĐẢO NGƯỢC ngày 2026-09-01) — THỐNG NHẤT TOÀN
+SITE về 1 style duy nhất, KHÔNG còn "2 gia đình".**
+
+Quyết định gốc (2026-08-31, xem lịch sử Git nếu cần) từng chủ ý giữ 2 "gia
+đình" style riêng biệt (Storefront tối giản vuông vức vs Account nền dịu bo
+góc mềm). Người dùng đã trực tiếp xem kết quả thực tế của "gia đình Account"
+(Đợt 3 — `profile`, `orders/lookup`, `change-password` bo góc `rounded-2xl/
+3xl`, nền `#fafafc`, `font-serif`) và KHÔNG hài lòng — quyết định ĐẢO NGƯỢC:
+**toàn bộ site dùng đúng 1 style — vuông vức, mạnh mẽ, tương phản đen-trắng**,
+theo đúng chuẩn Storefront hiện có (`Home`, `Login`, `Register`, `Accessories`).
+
+Bảng style token chuẩn (áp cho MỌI trang mới/sửa sau này, chuẩn hóa từ
+`login/page.tsx` + `components/common/ProductCard.tsx`):
+
+| Thành phần | Token |
+|---|---|
+| Nền trang | `bg-white text-[#111] font-sans antialiased` |
+| Thẻ/khối | `bg-white border border-gray-200 rounded-none shadow-sm` (nhấn mạnh: `border-2 border-black`) |
+| Heading trang | `text-2xl md:text-4xl font-black uppercase tracking-[0.2em]` — **không dùng `font-serif`** |
+| Label | `text-[11px] font-bold uppercase tracking-wider text-gray-700` |
+| Input | `bg-white border border-gray-300 rounded-none px-4 py-3.5 text-xs font-medium focus:border-black` |
+| Nút chính | `bg-black text-white text-xs font-bold uppercase tracking-[0.2em] py-4 rounded-none hover:bg-gray-800` |
+| Badge | vuông `rounded-none`, `text-[10px] font-black uppercase tracking-widest` |
+| Banner lỗi | `bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold uppercase tracking-wider rounded-none` |
+
+**Cấm dùng lại** (dấu hiệu của style cũ đã bỏ): `rounded-2xl`, `rounded-3xl`,
+`rounded-full` (trừ avatar tròn nếu chủ đích giữ), `font-serif`, `bg-[#fafafc]`.
+
+⚠️ **Bài học kỹ thuật phát hiện cùng đợt này (không phải style)**: form Profile
+từng luôn báo lỗi 400 khi lưu, kể cả khi dữ liệu hợp lệ. Nguyên nhân KHÔNG chỉ
+là gửi thừa `avatarUrl` (field không có trong `UpdateProfileDto`) mà còn do
+**`@IsOptional()` của class-validator chỉ bỏ qua `null`/`undefined`, KHÔNG bỏ
+qua chuỗi rỗng `''`** — field để trống vẫn bị `@Matches`/`@IsEnum` từ chối.
+Bất kỳ form nào gửi payload có field optional để trống dạng `''` đều dính lỗi
+này — PHẢI loại field rỗng khỏi payload trước khi gửi, không tin `@IsOptional()`
+tự lo việc đó. Đồng thời `message` lỗi từ `ValidationPipe` là MẢNG string, đổ
+thẳng vào JSX sẽ dính chữ liền nhau không đọc được — dùng `getApiErrorMessage()`
+(`frontend/src/lib/api.ts`) để chuẩn hóa về chuỗi nhiều dòng.
 
 **G1 — AUDIT TOÀN DIỆN (BẮT BUỘC làm ĐẦU TIÊN ở phiên tiếp theo, không nhảy
 thẳng vào sửa dù đã biết rõ vấn đề ở G2):**
