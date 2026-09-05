@@ -19,6 +19,7 @@ import { BrandsModule } from './brands/brands.module';
 import { SubCategoriesModule } from './sub-categories/sub-categories.module';
 import { CategoriesModule } from './categories/categories.module';
 import { HealthModule } from './health/health.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 @Module({
@@ -108,6 +109,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     SubCategoriesModule,
     CategoriesModule,
     HealthModule,
+    ReviewsModule,
   ],
   controllers: [],
   providers: [

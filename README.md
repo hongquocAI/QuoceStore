@@ -18,6 +18,10 @@ depth), khả năng mở rộng, và khả năng quan sát hệ thống (observa
 - Theo dõi đơn hàng với **timeline trực quan** (Chờ xử lý → Đang xử lý → Đã
   giao vận → Đã giao hàng), phân biệt rõ trạng thái thanh toán và trạng thái
   giao hàng
+- **Đánh giá sản phẩm**: chỉ khách hàng đã mua và nhận hàng thành công mới
+  được đánh giá (sao 1-5 + bình luận), hiển thị ngay không qua kiểm duyệt,
+  điểm trung bình + biểu đồ phân bố sao tính theo thời gian thực; khách có
+  thể sửa/xóa đánh giá của chính mình
 - Đăng nhập bằng email/mật khẩu hoặc **Google Sign-In**
 - Trang pháp lý: Chính sách bảo mật, Điều khoản dịch vụ, Chính sách đổi trả
   (`/privacy-policy`, `/terms`, `/return-policy`), có Footer điều hướng toàn

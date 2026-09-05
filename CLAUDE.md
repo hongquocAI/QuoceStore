@@ -397,13 +397,42 @@ tả gốc dưới đây, xem PROGRESS.md để biết chi tiết chính xác t�
    `orders`/`register`/`login` đều đã áp dụng đúng style thống nhất này.
 3. ✅ **G2 ĐÃ XONG (2026-09-02)** — dynamic list Highlights/Specs Admin
    Products (xem mục G2 bên dưới).
-4. ✅ **Đợt 4 (feature gap) — 4/8 việc ĐÃ XONG, 4/8 việc TREO LẠI
-   (2026-09-02)**: ĐÃ làm Category Admin CRUD, Header mobile nav, orders
-   timeline trực quan, sản phẩm liên quan. TREO LẠI (cần người dùng quyết
-   định kiến trúc): cart chọn item riêng để checkout, checkout
-   progress-step, review sản phẩm (cần bảng `Review` + chính sách kiểm
-   duyệt), sổ địa chỉ (cần bảng `Address` + tích hợp checkout). Chi tiết
-   đầy đủ xem PROGRESS.md `[2026-09-02]` mục "Đợt 4 Nhóm G".
+4. ✅ **Đợt 4 (feature gap) — 4/8 việc ĐÃ XONG, 3/8 việc TREO LẠI, 1/8 ĐÃ
+   ĐÓNG (2026-09-05)**: ĐÃ làm Category Admin CRUD, Header mobile nav, orders
+   timeline trực quan, sản phẩm liên quan (2026-09-02). **Review sản phẩm
+   ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05)** — xem mục riêng ngay dưới đây. Còn TREO
+   LẠI (cần người dùng quyết định kiến trúc): cart chọn item riêng để
+   checkout, checkout progress-step, sổ địa chỉ (cần bảng `Address` + tích
+   hợp checkout). Chi tiết đầy đủ xem PROGRESS.md `[2026-09-02]` mục "Đợt 4
+   Nhóm G".
+
+### ✅ Review sản phẩm ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05, backend + frontend)
+
+5 quyết định người dùng đã chốt trước khi vào Plan Mode: chỉ khách ĐÃ MUA mới
+review (verify qua `OrderItem`), không kiểm duyệt (hiện ngay), điểm TB tính
+on-the-fly (KHÔNG lưu field tổng hợp trên `Product`), cho sửa/xóa review của
+chính mình, unique 1 review/user/product. Module hoàn toàn ĐỘC LẬP — không
+đụng `cart`/`checkout`/`payment`/`CartContext`.
+
+- Model `Review` mới (`schema.prisma`) — `@@unique([userId, productId])` là
+  **composite unique đầu tiên của dự án**. Migration `add_review` chỉ THÊM
+  bảng, an toàn.
+- Module `backend/src/reviews/` (mirror `brands/`): `GET /reviews` (public,
+  phân trang + `summary` điểm TB/phân bố sao), `GET /reviews/eligibility`
+  (JWT), `POST /reviews` (JWT + `@Throttle 5/phút`), `PATCH|DELETE /reviews/:id`
+  (chủ review hoặc ADMIN cho DELETE). Envelope `{ success, data }` toàn module
+  (mirror `OrdersService`, không mirror `ProductService` bare).
+- **"Đã mua" = `OrderItem` của user trỏ sản phẩm VÀ `Order.shippingStatus =
+  'DELIVERED'`** — quyết định tự chốt, không chỉ "đã đặt" (COD không cần trả
+  tiền trước là kẽ hở đặt-review-rồi-hủy). Nếu sau này nới lỏng điều kiện
+  này, cân nhắc kỹ hệ quả spam.
+- Frontend: `components/common/StarRating.tsx` + `components/product/
+  ProductReviews.tsx`, chèn vào `product/[slug]/page.tsx` giữa thông tin sản
+  phẩm và "Sản phẩm liên quan".
+- Đã tự verify: `tsc --noEmit` + `npm run build` sạch cả 2 phía; test API
+  thật qua script Node (JWT tự ký) — 16/16 ca đúng kỳ vọng, không lộ email
+  user trong response public, đã dọn sạch dữ liệu test. **CHƯA test UI bằng
+  mắt** — xem PROGRESS.md mục "🔍 CẦN NGƯỜI DÙNG TỰ TEST UI BẰNG MẮT".
 
 **Bối cảnh — đổi thứ tự ưu tiên toàn dự án:** Người dùng đã xác nhận
 (2026-08-31) mục tiêu chính hiện tại là tạo 1 project HOÀN CHỈNH, ĐẸP để

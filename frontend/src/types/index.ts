@@ -82,6 +82,30 @@ export interface OrderItem {
   variant?: ProductVariant;
 }
 
+// ⚡ Đánh giá sản phẩm — chỉ khách đã mua (DELIVERED) mới được review.
+export interface Review {
+  id: string;
+  productId: string;
+  userId: string;
+  rating: number;
+  comment?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: { id: string; fullName: string; avatarUrl?: string | null };
+}
+
+export interface ReviewSummary {
+  average: number;
+  count: number;
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+}
+
+export interface ReviewEligibility {
+  canReview: boolean;
+  reason: 'ALREADY_REVIEWED' | 'NOT_PURCHASED' | null;
+  myReview: Review | null;
+}
+
 export interface Order {
   id: string;
   orderCode: number;

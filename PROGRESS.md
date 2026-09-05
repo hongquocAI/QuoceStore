@@ -14,9 +14,78 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-09-02, phiên làm việc tự động qua đêm)*
+*(cập nhật lần cuối: 2026-09-05)*
 
 ### Đang làm / Việc tiếp theo ngay
+
+**✅ Review sản phẩm (mục treo #2 của Nhóm G) — BACKEND + FRONTEND ĐÃ XONG
+(2026-09-05), CHỜ NGƯỜI DÙNG TEST UI BẰNG MẮT (chưa test).**
+
+5 quyết định kiến trúc người dùng đã chốt trước: chỉ khách ĐÃ MUA (verify qua
+`OrderItem`) mới được review, không kiểm duyệt (hiện ngay), điểm TB tính
+on-the-fly (không lưu field tổng hợp trên `Product`), cho sửa/xóa review của
+chính mình, unique 1 review/user/product. Module hoàn toàn ĐỘC LẬP — không
+đụng `cart`/`checkout`/`payment`/`CartContext`.
+
+- **Schema**: model `Review` mới (`backend/prisma/schema.prisma`) — migration
+  `add_review` (chỉ THÊM bảng, không xóa/đổi cột nào, an toàn). PK `uuid()`,
+  `@@unique([userId, productId])` (composite unique **đầu tiên** của dự án),
+  `@@index([productId])`, `onDelete: Cascade` cho cả 2 FK (review "chết theo"
+  sản phẩm/user bị xóa — không cần giữ lại như OrderItem).
+- **Backend**: module mới `backend/src/reviews/` (mirror `brands/`) — 5
+  endpoint: `GET /reviews` (public, phân trang + `summary` điểm TB/phân bố
+  sao), `GET /reviews/eligibility` (JWT, trả `canReview`/`reason`/`myReview`),
+  `POST /reviews` (JWT + `@Throttle 5/phút`), `PATCH /reviews/:id`,
+  `DELETE /reviews/:id` (chủ review HOẶC ADMIN). "Đã mua" = có `OrderItem`
+  của user trỏ tới sản phẩm với `Order.shippingStatus = 'DELIVERED'` (quyết
+  định tự chốt: chỉ "đã đặt" là kẽ hở review-rồi-hủy-đơn). Toàn module dùng
+  envelope `{ success, data }` (mirror `OrdersService`, không mirror
+  `ProductService` bare). `@@unique` bắt lỗi qua Prisma `P2002` → 409, không
+  check-rồi-insert (tránh khe race). Đã đăng ký `ReviewsModule` vào
+  `app.module.ts`.
+- **Frontend**: `types/index.ts` thêm `Review`/`ReviewSummary`/
+  `ReviewEligibility`. Component mới `components/common/StarRating.tsx`
+  (hiển thị + chọn sao, dùng `lucide-react` có sẵn) và
+  `components/product/ProductReviews.tsx` (tổng quan điểm TB + phân bố sao,
+  danh sách phân trang, form gửi/sửa, xóa qua `ConfirmModal` có sẵn). Chèn
+  vào `app/product/[slug]/page.tsx` giữa khối thông tin sản phẩm và section
+  "Sản phẩm liên quan". Style đúng bảng token đã chốt (vuông vức đen-trắng).
+- **Đã tự verify** (không cần người dùng): `npx tsc --noEmit` sạch cả
+  backend/frontend, `npm run build` frontend sạch (route `/product/[slug]`
+  compile OK). Test API thật qua script Node dùng JWT tự ký (`sub` field,
+  đúng bài học CLAUDE.md) + user CUSTOMER/ADMIN thật trong DB: tạo 1 đơn hàng
+  test → set `DELIVERED` → xác nhận đúng toàn bộ 16 ca (201/409/403/400/404
+  theo đúng kỳ vọng, `summary.average`/`count` đúng, **không lộ email user**
+  trong response public, PATCH/DELETE ownership đúng, ADMIN xóa được review
+  người khác). Đã dọn sạch order + review test khỏi DB trước khi báo hoàn
+  thành (xác nhận lại bằng query: `reviews còn lại: 0`, `order test còn sót: 0`).
+
+**🔍 CẦN NGƯỜI DÙNG TỰ TEST UI BẰNG MẮT (chưa test)**:
+1. Vào `/product/[slug]` bất kỳ — xác nhận section "Đánh giá sản phẩm" hiện
+   đúng vị trí (giữa thông tin sản phẩm và "Sản phẩm liên quan"), điểm TB +
+   phân bố sao hiển thị đúng khi chưa có review nào (hiện "—" và "Chưa có
+   đánh giá nào").
+2. Chưa đăng nhập → xác nhận thấy dòng "Đăng nhập để đánh giá sản phẩm này".
+3. Đăng nhập bằng tài khoản CHƯA mua sản phẩm đó → xác nhận thấy "Bạn cần
+   mua và nhận sản phẩm này trước khi đánh giá."
+4. Để test được luồng viết review thật: vào `/admin/orders`, tìm 1 đơn của
+   tài khoản bạn đang dùng để test, chuyển `shippingStatus` lên `DELIVERED`
+   (qua đúng state machine: PENDING→PROCESSING→SHIPPED→DELIVERED) cho sản
+   phẩm muốn review, rồi quay lại trang sản phẩm đó — xác nhận form "Viết
+   đánh giá" hiện ra, chọn sao + nhập bình luận + Gửi → review hiện ngay lập
+   tức trong danh sách (không cần F5), điểm TB cập nhật đúng.
+5. Bấm "Sửa" trên đánh giá của mình → đổi sao/bình luận → Cập nhật → xác
+   nhận đổi đúng. Bấm "Xóa" → xác nhận `ConfirmModal` hiện, xóa xong review
+   biến mất khỏi danh sách + điểm TB cập nhật lại.
+6. Thử gửi review lần 2 cho cùng sản phẩm (F5 lại trang) → xác nhận form ẩn
+   đi, hiện lại đúng đánh giá đã gửi (không cho gửi trùng).
+7. Phân trang: nếu 1 sản phẩm có > 10 review mới thấy nút Trước/Sau — không
+   bắt buộc test nếu chưa có đủ dữ liệu thật, để dành khi catalog lớn hơn.
+
+**Nếu phát hiện lỗi khi test UI**: mô tả cụ thể bước tái hiện, KHÔNG tự sửa
+vội — quay lại hỏi để xác nhận đúng nguyên nhân trước khi đổi code.
+
+### (Lịch sử — các mục dưới đây vẫn đúng, giữ nguyên để tra cứu)
 
 **✅ Đợt 4 Nhóm G (Feature gap) — 4/8 việc ĐÃ LÀM, 4/8 việc TREO LẠI
 (2026-09-02, làm tự động qua đêm).** G1 audit (2026-08-31) liệt kê 7 gap
@@ -2018,3 +2087,73 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
 - **Lưu ý/vấn đề gặp phải**: ngoài sự cố nhỏ port 5000 đã nêu trên (không
   gây hậu quả, xử lý đúng cách — kiểm tra trước khi hành động, không giết
   tiến trình bừa), không có vấn đề kỹ thuật nào khác ngoài dự kiến.
+
+### [2026-09-05] Đã hoàn thành: Review sản phẩm (mục treo #2 Nhóm G) — backend + frontend
+- **File đã sửa/tạo**:
+  - `backend/prisma/schema.prisma` — model `Review` mới + back-relation
+    `Product.reviews`/`User.reviews`; migration
+    `prisma/migrations/20260905071726_add_review/`.
+  - `backend/src/reviews/` (mới) — `reviews.module.ts`, `reviews.controller.ts`,
+    `reviews.service.ts`, `dto/create-review.dto.ts`, `dto/update-review.dto.ts`,
+    `dto/query-review.dto.ts`.
+  - `backend/src/app.module.ts` — đăng ký `ReviewsModule`.
+  - `frontend/src/types/index.ts` — thêm `Review`/`ReviewSummary`/`ReviewEligibility`.
+  - `frontend/src/components/common/StarRating.tsx` (mới).
+  - `frontend/src/components/product/ProductReviews.tsx` (mới).
+  - `frontend/src/app/product/[slug]/page.tsx` — chèn `<ProductReviews />`.
+- **Quyết định kỹ thuật đáng lưu ý** (ngoài 5 quyết định người dùng đã chốt
+  trước khi vào Plan Mode):
+  - "Đã mua" = `OrderItem` của user trỏ tới sản phẩm VÀ `Order.shippingStatus
+    = 'DELIVERED'` — không chỉ "đã đặt" (COD không cần trả tiền trước, sẽ là
+    kẽ hở đặt-review-rồi-hủy). Đánh đổi: muốn test phải đẩy đơn lên
+    `DELIVERED` qua `/admin/orders` trước.
+  - Composite unique `@@unique([userId, productId])` là **cái đầu tiên của
+    dự án** — Prisma tự đặt tên `userId_productId` cho where clause tra cứu
+    theo cặp khóa này (`findUnique({ where: { userId_productId: {...} } })`).
+  - Bắt lỗi `Prisma.PrismaClientKnownRequestError` code `P2002` để trả 409
+    thay vì check-tồn-tại-rồi-insert — loại bỏ khe race giữa 2 request tạo
+    review đồng thời cho cùng 1 cặp user+product.
+  - `GET /reviews` dùng `$transaction([findMany, count, aggregate, groupBy])`
+    để items/total/summary đọc trên cùng 1 ảnh chụp dữ liệu (mirror pattern
+    `ProductService.findPaginated`/`OrdersService.findAllForAdmin`).
+  - Envelope response `{ success, data }` toàn module (mirror `OrdersService`,
+    KHÔNG mirror `ProductService` bare) — quyết định tự chốt vì nhất quán
+    trong-module quan trọng hơn xuyên-module (CLAUDE.md nguyên tắc 7).
+  - KHÔNG cache review (cùng lý do đã áp dụng cho danh sách sản phẩm: dữ liệu
+    biến động, Keyv/Redis không xóa theo prefix).
+  - `ProductService.findOne()` giữ nguyên, KHÔNG thêm field `avgRating` vào
+    `Product` — điểm TB tính on-the-fly mỗi lần gọi `GET /reviews`.
+- **Đã test**:
+  - `npx tsc --noEmit` backend + frontend: sạch.
+  - `npm run build` frontend: sạch, route `/product/[slug]` compile OK
+    (dynamic route, không prerender — đúng vì cần fetch theo slug).
+  - Script Node test API thật (`scripts/test-reviews.js` trong scratchpad,
+    KHÔNG commit vào repo) dùng JWT tự ký (`JWT_SECRET` từ `.env`, payload
+    field `sub` — đúng bài học CLAUDE.md về lỗi 500 do dùng sai field `id`),
+    2 user CUSTOMER thật + 1 ADMIN thật có sẵn trong DB. Tạo 1 đơn hàng test
+    DELIVERED cho customerA mua 1 sản phẩm thật, chạy qua toàn bộ 16 ca (xem
+    danh sách đầy đủ trong bảng Verification của Plan đã duyệt) — TẤT CẢ
+    PASS, bao gồm: 201/409/403/400×3/404 đúng theo từng ca, `forbidNonWhitelisted`
+    chặn field lạ `userId`, `summary.average`/`count` đúng, **response public
+    không lộ email user** (chỉ `id`/`fullName`/`avatarUrl`), PATCH/DELETE
+    ownership đúng (403 cho user khác, 200 cho chủ), ADMIN xóa được review
+    người khác.
+  - Đã dọn sạch dữ liệu test: order test + review test bị xóa ngay trong
+    script (transaction test tự cleanup ở cuối), xác nhận lại bằng query
+    riêng: `reviews còn lại: 0`, `order test còn sót: 0`. Sản phẩm dùng để
+    test là sản phẩm CÓ SẴN trong catalog, không tạo/xóa sản phẩm nào.
+- **Lưu ý/vấn đề gặp phải**:
+  - `npx prisma migrate dev` xong nhưng `npx prisma generate` lần đầu lỗi
+    `EPERM` — backend dev server (`npm run start:dev`, PID xác nhận qua
+    `netstat` trên port 5000) đang khóa file `query_engine-windows.dll.node`.
+    Đã dừng đúng process đó (xác nhận PID qua `tasklist` trước khi
+    `taskkill`, không đoán bừa) rồi generate lại thành công. Sau khi test
+    xong, đã khởi động lại backend dev server (để người dùng test UI ngay
+    không cần tự bật) — KHÔNG tắt lại, đây là thay đổi trạng thái người dùng
+    cần biết.
+  - Rate limit `@Throttle 5/phút` trên `POST /reviews` chặn đúng 429 khi
+    script test gọi liên tiếp 5 request lỗi trước request hợp lệ — hành vi
+    ĐÚNG của rate limiting, không phải bug. Đã sửa script chờ qua cửa sổ 60s
+    thay vì nới lỏng throttle.
+  - CHƯA test UI thật bằng mắt — xem mục "🔍 CẦN NGƯỜI DÙNG TỰ TEST UI BẰNG
+    MẮT" ở phần Trạng thái hiện tại đầu file.

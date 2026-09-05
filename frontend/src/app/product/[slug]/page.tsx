@@ -5,6 +5,7 @@ import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
 import ProductCard from '@/components/common/ProductCard';
+import ProductReviews from '@/components/product/ProductReviews';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -366,6 +367,8 @@ export default function ProductDetailPage({ params }: PageProps) {
 
         </div>
       </div>
+
+      <ProductReviews productId={product.id} />
 
       {/* ⚡ Đợt 4 Nhóm G: sản phẩm liên quan (cùng SubCategory) — ẩn hẳn
           section nếu không có kết quả, không hiện khối trống. */}

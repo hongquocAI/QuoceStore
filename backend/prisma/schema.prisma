@@ -57,6 +57,7 @@ model User {
   refreshTokens RefreshToken[]
   orders        Order[]
   auditLogs     AuditLog[]
+  reviews       Review[]
 
   @@map("users")
 }
@@ -150,6 +151,7 @@ model Product {
   brand         Brand            @relation(fields: [brandId], references: [id], onDelete: Restrict)
   variants      ProductVariant[]
   orderItems    OrderItem[]
+  reviews       Review[]
 
   @@index([categoryId])
   @@index([subCategoryId])
@@ -254,6 +256,29 @@ model Discount {
   expiryDate DateTime?
 
   @@map("discounts")
+}
+
+// ⚡ MỚI: đánh giá sản phẩm — chỉ khách ĐÃ MUA (verify qua OrderItem +
+// Order.shippingStatus = DELIVERED, xem ReviewsService.hasPurchased()) mới
+// được review. Không kiểm duyệt — hiện ngay khi gửi. Điểm trung bình tính
+// on-the-fly (aggregate), KHÔNG lưu field tổng hợp trên Product.
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Mỗi khách chỉ review 1 lần/sản phẩm — composite unique đầu tiên của
+  // dự án. Tự tạo index có prefix userId nên không cần @@index([userId]) riêng.
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("reviews")
 }
 
 model AuditLog {
