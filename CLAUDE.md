@@ -397,13 +397,45 @@ tả gốc dưới đây, xem PROGRESS.md để biết chi tiết chính xác t�
    `orders`/`register`/`login` đều đã áp dụng đúng style thống nhất này.
 3. ✅ **G2 ĐÃ XONG (2026-09-02)** — dynamic list Highlights/Specs Admin
    Products (xem mục G2 bên dưới).
-4. ✅ **Đợt 4 (feature gap) — 6/8 việc ĐÃ XONG, 1/8 TREO LẠI (2026-09-05)**:
+4. ✅ **Đợt 4 (feature gap) — 8/8 việc ĐÃ XONG (2026-09-05) — TOÀN BỘ ĐÓNG**:
    ĐÃ làm Category Admin CRUD, Header mobile nav, orders timeline trực quan,
    sản phẩm liên quan (2026-09-02); Review sản phẩm (2026-09-05); Cart chọn
-   item riêng để checkout + Checkout progress-step (2026-09-05) — xem 2 mục
-   riêng ngay dưới đây. Còn TREO LẠI DUY NHẤT: sổ địa chỉ nhiều địa chỉ (cần
-   bảng `Address` + tích hợp checkout). Chi tiết đầy đủ xem PROGRESS.md
-   `[2026-09-02]` mục "Đợt 4 Nhóm G".
+   item riêng để checkout + Checkout progress-step (2026-09-05); Sổ địa chỉ
+   nhiều địa chỉ (2026-09-05, backend+frontend xong, CHỜ người dùng test UI
+   bằng mắt — xem PROGRESS.md) — xem 3 mục riêng ngay dưới đây. **Không còn
+   mục treo nào trong Nhóm G.** Chi tiết đầy đủ xem PROGRESS.md `[2026-09-02]`
+   mục "Đợt 4 Nhóm G".
+
+### ⏳ Sổ địa chỉ nhiều địa chỉ — BACKEND + FRONTEND XONG (2026-09-05), CHỜ TEST UI
+
+Làm tự động (autonomous) trong lúc người dùng nghỉ — tự quyết định các câu
+hỏi thiết kế đơn giản theo tinh thần "đủ dùng, không over-engineer", không
+có quyết định kiến trúc lớn nào cần dừng lại hỏi.
+
+- Model `Address` mới (`recipientName`, `phone`, `address`, `isDefault`),
+  `onDelete: Cascade` từ User. **KHÔNG FK sang Order** — `Order.address`
+  vẫn là snapshot string như cũ, sổ địa chỉ chỉ dùng để điền sẵn form
+  checkout.
+- Module `backend/src/addresses/` (mirror `brands/`): toàn bộ JWT, chỉ thao
+  tác được địa chỉ của chính mình (403 nếu không phải chủ, không có route
+  Admin — dữ liệu cá nhân thuần túy). Địa chỉ đầu tiên của user tự động
+  `isDefault=true`. Đặt mặc định tách route riêng
+  `PATCH /addresses/:id/set-default` (mirror `PATCH /orders/:id/shipping-status`).
+  Xóa địa chỉ đang mặc định (còn địa chỉ khác) tự động đề bạt địa chỉ mới
+  nhất còn lại làm mặc định.
+- Frontend: trang mới `/addresses` (danh sách + modal thêm/sửa + xóa qua
+  `ConfirmModal`), link ở `Header.tsx` dropdown tài khoản.
+- **Chạm nhẹ `checkout/page.tsx`** (đúng cảnh báo đã lường trước): CHỈ thêm
+  dropdown "Chọn địa chỉ đã lưu" tự điền 3 field (`customerName`/
+  `customerPhone`/`address`) — đã tự grep xác nhận KHÔNG đụng
+  `handleSubmit`/`checkoutItems`/subtotal/guard/payload/polling/early-return.
+  Không đổi logic tính tiền/tồn kho.
+- Đã tự verify: `tsc --noEmit` + `npm run build` sạch cả 2 phía; test API
+  thật qua script Node (JWT tự ký) — 16/16 ca đúng kỳ vọng, đã dọn sạch dữ
+  liệu test. **CHƯA test UI bằng mắt** — xem PROGRESS.md mục "🔍 CẦN NGƯỜI
+  DÙNG TỰ TEST UI BẰNG MẮT" để biết 7 bước cần test, đặc biệt bước 7 (đặt
+  1 đơn COD thật sau khi dùng dropdown, xác nhận luồng đặt hàng không bị
+  ảnh hưởng).
 
 ### ✅ Cart chọn item riêng để checkout + Checkout progress-step ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05)
 

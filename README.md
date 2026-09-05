@@ -25,6 +25,8 @@ depth), khả năng mở rộng, và khả năng quan sát hệ thống (observa
   được đánh giá (sao 1-5 + bình luận), hiển thị ngay không qua kiểm duyệt,
   điểm trung bình + biểu đồ phân bố sao tính theo thời gian thực; khách có
   thể sửa/xóa đánh giá của chính mình
+- **Sổ địa chỉ** nhiều địa chỉ giao hàng, đánh dấu 1 địa chỉ mặc định — tự
+  điền sẵn thông tin ở trang thanh toán
 - Đăng nhập bằng email/mật khẩu hoặc **Google Sign-In**
 - Trang pháp lý: Chính sách bảo mật, Điều khoản dịch vụ, Chính sách đổi trả
   (`/privacy-policy`, `/terms`, `/return-policy`), có Footer điều hướng toàn

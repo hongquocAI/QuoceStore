@@ -14,9 +14,91 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-09-05)*
+*(cập nhật lần cuối: 2026-09-05, làm tự động trong lúc người dùng nghỉ)*
 
 ### Đang làm / Việc tiếp theo ngay
+
+**✅ Sổ địa chỉ nhiều địa chỉ (mục treo CUỐI CÙNG của Nhóm G) — BACKEND +
+FRONTEND ĐÃ XONG (2026-09-05), CHỜ NGƯỜI DÙNG TEST UI BẰNG MẮT (chưa test).**
+
+Làm tự động (autonomous), tự quyết định các câu hỏi thiết kế đơn giản theo
+tinh thần "đủ dùng, không over-engineer" — mirror pattern `brands/` +
+`orders/` đã có, KHÔNG có quyết định lớn nào cần dừng lại hỏi.
+
+- **Schema**: model `Address` mới (`recipientName`, `phone`, `address`,
+  `isDefault Boolean @default(false)`) — migration `add_address` (chỉ THÊM
+  bảng, an toàn). `onDelete: Cascade` từ User (địa chỉ "chết theo" tài
+  khoản bị xóa, hợp lý vì đây là dữ liệu cá nhân không cần giữ lại như
+  OrderItem). **KHÔNG FK sang Order** — `Order.address` vẫn là snapshot
+  string tại thời điểm đặt hàng như cũ, sổ địa chỉ CHỈ dùng để điền sẵn
+  form checkout, không đổi cách Order lưu trữ.
+- **Backend**: module mới `backend/src/addresses/` (mirror `brands/`) — 5
+  endpoint, TOÀN BỘ yêu cầu JWT, chỉ thao tác được địa chỉ của chính mình
+  (403 nếu không phải chủ, không có route Admin quản lý địa chỉ người khác
+  vì đây là dữ liệu cá nhân thuần túy):
+  - `GET /addresses` — danh sách của user, sắp `isDefault desc, createdAt desc`
+  - `POST /addresses` — địa chỉ ĐẦU TIÊN của user tự động `isDefault=true`
+    dù không truyền (tránh trạng thái "có địa chỉ nhưng không cái nào mặc
+    định"); nếu gửi `isDefault: true` thì tự bỏ mặc định của địa chỉ khác
+    trong 1 transaction
+  - `PATCH /addresses/:id` — sửa `recipientName`/`phone`/`address`
+    (KHÔNG có `isDefault` ở DTO này, đặt mặc định đi qua route riêng bên
+    dưới — mirror pattern `PATCH /orders/:id/shipping-status` tách khỏi
+    update thường)
+  - `PATCH /addresses/:id/set-default` — transaction: bỏ mặc định cũ, đặt
+    địa chỉ này làm mặc định
+  - `DELETE /addresses/:id` — nếu xóa đúng địa chỉ đang mặc định VÀ còn địa
+    chỉ khác, tự động đề bạt địa chỉ mới nhất còn lại làm mặc định (tránh
+    checkout mất địa chỉ mặc định đột ngột)
+- **Frontend**: `types/index.ts` thêm `Address`. Trang mới
+  `frontend/src/app/addresses/page.tsx` — danh sách + modal thêm/sửa (mirror
+  pattern mini-modal quick-add đã có ở Admin Products) + xóa qua
+  `ConfirmModal` có sẵn. `Header.tsx` thêm link "Sổ địa chỉ" vào dropdown
+  tài khoản.
+- **Chạm nhẹ vào `checkout/page.tsx`** (đúng cảnh báo đã lường trước) —
+  CHỈ thêm 1 dropdown "Chọn địa chỉ đã lưu" trong box "Thông tin giao hàng":
+  fetch `/addresses` khi có `user`, tự chọn + điền sẵn 3 field
+  (`customerName`/`customerPhone`/`address`) theo địa chỉ mặc định lúc tải
+  trang, đổi lựa chọn trong dropdown điền lại 3 field đó. **TUYỆT ĐỐI
+  KHÔNG đụng**: `handleSubmit`, `checkoutItems`, `subtotal`/discount, guard
+  `cart.length`/`checkoutItems.length`, payload `POST /orders`, thứ tự
+  early-return `orderResult`, polling effect — đã tự grep xác nhận không
+  dòng nào trong các phần này bị chỉnh sửa. Không có thay đổi nào tới logic
+  tính tiền/tồn kho, đúng ranh giới người dùng đã đặt ra.
+- **Đã tự verify**: `npx tsc --noEmit` sạch cả backend/frontend, `npm run
+  build` frontend sạch (route `/addresses` mới compile OK). Test API thật
+  qua script Node (JWT tự ký, 2 user CUSTOMER thật) — **16/16 ca PASS**:
+  401 không cookie, tạo địa chỉ đầu tiên tự động mặc định, tạo địa chỉ thứ 2
+  không mặc định, đổi mặc định tự bỏ mặc định cũ, 403 khi thao tác địa chỉ
+  người khác (set-default/update/delete), update hợp lệ bởi chủ sở hữu, xóa
+  địa chỉ mặc định tự đề bạt địa chỉ còn lại, 404 khi id không tồn tại,
+  validate SĐT/field lạ đúng 400. Đã dọn sạch dữ liệu test, xác nhận lại
+  bằng query (`còn lại: 0`).
+
+**🔍 CẦN NGƯỜI DÙNG TỰ TEST UI BẰNG MẮT (chưa test)**:
+1. Đăng nhập → vào dropdown tài khoản → bấm "Sổ địa chỉ" → xác nhận trang
+   `/addresses` hiện đúng, danh sách rỗng ban đầu (nếu chưa từng thêm).
+2. Bấm "+ Thêm địa chỉ" → điền form → Lưu → xác nhận địa chỉ xuất hiện ngay,
+   có badge "Mặc định" (địa chỉ đầu tiên luôn tự động mặc định).
+3. Thêm địa chỉ thứ 2 → xác nhận KHÔNG có badge mặc định. Bấm "Đặt mặc
+   định" trên địa chỉ thứ 2 → xác nhận badge chuyển đúng, địa chỉ đầu mất
+   badge.
+4. Bấm "Sửa" 1 địa chỉ → đổi thông tin → Lưu → xác nhận cập nhật đúng.
+5. Bấm "Xóa" địa chỉ ĐANG mặc định (khi còn ≥ 2 địa chỉ) → xác nhận
+   `ConfirmModal` hiện, xóa xong địa chỉ còn lại tự động lên làm mặc định.
+6. Vào `/checkout` (có sản phẩm trong giỏ) → xác nhận thấy dropdown "Chọn
+   địa chỉ đã lưu" phía trên ô "Họ và tên", tự điền sẵn theo địa chỉ mặc
+   định. Đổi dropdown sang địa chỉ khác → xác nhận 3 field điền lại đúng.
+   Vẫn có thể sửa tay sau khi chọn.
+7. **Quan trọng nhất**: đặt 1 đơn hàng thật (COD) sau khi dùng dropdown này
+   → xác nhận đơn hàng vẫn tạo thành công bình thường, `Order.address` lưu
+   đúng giá trị đã điền — xác nhận tính năng sổ địa chỉ KHÔNG làm hỏng
+   luồng đặt hàng.
+
+Không có mục "cần người dùng xác nhận" nào bị treo — không phát sinh quyết
+định kiến trúc lớn nào ngoài dự kiến trong lúc làm.
+
+### (Lịch sử — Cart chọn item + Checkout progress-step, đã đóng hoàn toàn 2026-09-05)
 
 **✅ Cart chọn item riêng để checkout + Checkout progress-step — ĐÃ ĐÓNG
 HOÀN TOÀN (2026-09-05), người dùng đã test UI thật PASS 6/6 bước.**
@@ -2234,3 +2316,56 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
   `cart.reduce` (VD badge Header). Backend không cần đổi gì.
 - Kết luận: Đợt 4 Nhóm G **HOÀN TẤT THÊM 1 MỤC**, chỉ còn "Sổ địa chỉ nhiều
   địa chỉ" là mục treo cuối cùng của Nhóm G.
+
+### [2026-09-05] Đã hoàn thành (tự động, người dùng nghỉ): Sổ địa chỉ nhiều địa chỉ
+- **File đã sửa/tạo**:
+  - `backend/prisma/schema.prisma` — model `Address` mới + back-relation
+    `User.addresses`; migration `prisma/migrations/20260905132043_add_address/`.
+  - `backend/src/addresses/` (mới) — `addresses.module.ts`,
+    `addresses.controller.ts`, `addresses.service.ts`,
+    `dto/create-address.dto.ts`, `dto/update-address.dto.ts`.
+  - `backend/src/app.module.ts` — đăng ký `AddressesModule`.
+  - `frontend/src/types/index.ts` — thêm `Address`.
+  - `frontend/src/app/addresses/page.tsx` (mới) — trang quản lý sổ địa chỉ.
+  - `frontend/src/components/Header.tsx` — thêm link "Sổ địa chỉ".
+  - `frontend/src/app/checkout/page.tsx` — thêm dropdown chọn địa chỉ đã
+    lưu (CHỈ autofill, không đụng logic tính tiền/tồn kho).
+- **Quyết định thiết kế tự chốt** (đơn giản, theo tinh thần "đủ dùng"):
+  - Địa chỉ đầu tiên của user luôn tự động `isDefault=true` — tránh trạng
+    thái "có địa chỉ nhưng không cái nào mặc định" mà checkout cần dựa vào.
+  - Đặt mặc định tách route riêng (`PATCH /addresses/:id/set-default`),
+    không gộp vào update thường — mirror pattern
+    `PATCH /orders/:id/shipping-status`.
+  - Xóa địa chỉ đang mặc định (khi còn địa chỉ khác) tự động đề bạt địa chỉ
+    mới nhất còn lại làm mặc định — tránh checkout mất mặc định đột ngột.
+  - KHÔNG có route Admin quản lý địa chỉ người khác — đây là dữ liệu cá
+    nhân thuần túy, không có nhu cầu nghiệp vụ nào cho Admin can thiệp.
+  - `Order.address` giữ nguyên là snapshot string tại thời điểm đặt hàng —
+    KHÔNG FK sang `Address`, sổ địa chỉ chỉ dùng để điền sẵn form, không
+    đổi cách Order lưu trữ địa chỉ.
+- **Đã test**:
+  - `npx tsc --noEmit` backend + frontend: sạch.
+  - `npm run build` frontend: sạch, route `/addresses` mới compile OK.
+  - Script Node test API thật (`test-addresses.js` trong scratchpad, KHÔNG
+    commit vào repo) dùng JWT tự ký (field `sub`), 2 user CUSTOMER thật có
+    sẵn trong DB — **16/16 ca PASS**: 401 không cookie, tạo địa chỉ đầu tự
+    động mặc định, tạo địa chỉ thứ 2 không mặc định, đổi mặc định tự bỏ mặc
+    định cũ, 403 khi thao tác địa chỉ người khác (set-default/update/
+    delete), update hợp lệ bởi chủ, xóa địa chỉ mặc định tự đề bạt địa chỉ
+    còn lại, 404 khi id không tồn tại, validate SĐT sai định dạng/field lạ
+    đúng 400. Đã dọn sạch dữ liệu test (query xác nhận `còn lại: 0`).
+  - Đã tự grep xác nhận thay đổi ở `checkout/page.tsx` KHÔNG chạm tới
+    `handleSubmit`, `checkoutItems`, `subtotal`/discount, các guard, payload
+    `POST /orders`, thứ tự early-return `orderResult`, polling effect —
+    đúng ranh giới người dùng đặt ra (không tự ý đổi logic tính tiền/tồn
+    kho).
+- **Lưu ý/vấn đề gặp phải**:
+  - `npx prisma migrate dev` xong nhưng `prisma generate` lần đầu lỗi
+    `EPERM` — backend dev server đang khóa file DLL (đã xác nhận PID qua
+    `netstat`/`tasklist` trước khi `taskkill`, không đoán bừa). Generate lại
+    thành công sau khi dừng server. Đã khởi động lại backend dev server sau
+    khi xong để sẵn sàng cho người dùng test UI khi thức dậy.
+  - CHƯA test UI thật bằng mắt (người dùng đang nghỉ) — xem mục "🔍 CẦN
+    NGƯỜI DÙNG TỰ TEST UI BẰNG MẮT" ở phần Trạng thái hiện tại đầu file.
+  - Không phát sinh quyết định kiến trúc lớn nào cần dừng lại hỏi — toàn bộ
+    nằm trong phạm vi "CRUD đơn giản mirror pattern có sẵn" như đã giao.

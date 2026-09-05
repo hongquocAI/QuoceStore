@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { api, getApiErrorMessage } from '@/lib/api';
 import { QRCodeSVG } from 'qrcode.react';
 import CheckoutProgress from '@/components/checkout/CheckoutProgress';
+import { Address } from '@/types';
 
 type PaymentMethod = 'COD' | 'BANK_TRANSFER';
 
@@ -38,6 +39,44 @@ export default function CheckoutPage() {
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
   const [address, setAddress] = useState(user?.address || '');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
+
+  // ⚡ Sổ địa chỉ: CHỈ dùng để điền sẵn 3 field trên (customerName/
+  // customerPhone/address) — KHÔNG đụng bất kỳ logic tính tiền/tồn kho/
+  // payload nào. `handleSubmit` vẫn đọc từ 3 state đã có sẵn ở trên như cũ.
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
+
+  useEffect(() => {
+    if (!user) return;
+    api
+      .get('/addresses')
+      .then((res) => {
+        const list: Address[] = res.data.data || [];
+        setSavedAddresses(list);
+        const defaultAddr = list.find((a) => a.isDefault);
+        if (defaultAddr) {
+          setSelectedAddressId(defaultAddr.id);
+          setCustomerName(defaultAddr.recipientName);
+          setCustomerPhone(defaultAddr.phone);
+          setAddress(defaultAddr.address);
+        }
+      })
+      .catch(() => {
+        // Không chặn checkout nếu tải sổ địa chỉ lỗi — khách vẫn nhập tay
+        // bình thường như trước khi có tính năng này.
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const handleSelectSavedAddress = (id: string) => {
+    setSelectedAddressId(id);
+    const addr = savedAddresses.find((a) => a.id === id);
+    if (addr) {
+      setCustomerName(addr.recipientName);
+      setCustomerPhone(addr.phone);
+      setAddress(addr.address);
+    }
+  };
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -377,6 +416,33 @@ export default function CheckoutPage() {
               <h2 className="text-[11px] uppercase tracking-widest font-bold text-gray-400 border-b border-gray-100 pb-3">
                 Thông tin giao hàng
               </h2>
+
+              {/* ⚡ Sổ địa chỉ: chỉ hiện khi đã đăng nhập và có ít nhất 1 địa
+                  chỉ lưu sẵn — chọn 1 địa chỉ chỉ ĐIỀN SẴN 3 field bên dưới,
+                  khách vẫn có thể sửa tay sau khi chọn. */}
+              {user && savedAddresses.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
+                    Chọn địa chỉ đã lưu
+                  </label>
+                  <select
+                    value={selectedAddressId}
+                    onChange={(e) => handleSelectSavedAddress(e.target.value)}
+                    className="w-full bg-white border border-gray-300 px-4 py-3.5 text-xs font-medium rounded-none focus:outline-none focus:border-black transition"
+                  >
+                    <option value="">— Nhập tay bên dưới —</option>
+                    {savedAddresses.map((addr) => (
+                      <option key={addr.id} value={addr.id}>
+                        {addr.recipientName} — {addr.phone} — {addr.address}
+                        {addr.isDefault ? ' (Mặc định)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <Link href="/addresses" className="text-[11px] font-bold uppercase tracking-wider text-gray-500 hover:text-black transition self-start">
+                    Quản lý sổ địa chỉ
+                  </Link>
+                </div>
+              )}
 
               <div className="flex flex-col gap-2">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Họ và tên</label>

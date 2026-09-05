@@ -123,6 +123,13 @@ export default function Header() {
                     Tra cứu đơn hàng
                   </Link>
                   <Link
+                    href="/addresses"
+                    className="block px-4 py-2.5 text-gray-800 hover:bg-gray-100 transition"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Sổ địa chỉ
+                  </Link>
+                  <Link
                     href="/change-password"
                     className="block px-4 py-2.5 text-gray-800 hover:bg-gray-100 transition"
                     onClick={() => setDropdownOpen(false)}

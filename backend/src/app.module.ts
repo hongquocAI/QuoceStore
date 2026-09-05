@@ -20,6 +20,7 @@ import { SubCategoriesModule } from './sub-categories/sub-categories.module';
 import { CategoriesModule } from './categories/categories.module';
 import { HealthModule } from './health/health.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { AddressesModule } from './addresses/addresses.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 @Module({
@@ -110,6 +111,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     CategoriesModule,
     HealthModule,
     ReviewsModule,
+    AddressesModule,
   ],
   controllers: [],
   providers: [

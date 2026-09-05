@@ -82,6 +82,18 @@ export interface OrderItem {
   variant?: ProductVariant;
 }
 
+// ⚡ Sổ địa chỉ — chỉ dùng để điền sẵn form checkout, không liên quan Order.
+export interface Address {
+  id: string;
+  userId: string;
+  recipientName: string;
+  phone: string;
+  address: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ⚡ Đánh giá sản phẩm — chỉ khách đã mua (DELIVERED) mới được review.
 export interface Review {
   id: string;

@@ -58,6 +58,7 @@ model User {
   orders        Order[]
   auditLogs     AuditLog[]
   reviews       Review[]
+  addresses     Address[]
 
   @@map("users")
 }
@@ -279,6 +280,27 @@ model Review {
   @@unique([userId, productId])
   @@index([productId])
   @@map("reviews")
+}
+
+// ⚡ MỚI: Sổ địa chỉ nhiều địa chỉ — mỗi user lưu nhiều địa chỉ giao hàng,
+// đánh dấu 1 địa chỉ mặc định. Chỉ dùng để ĐIỀN SẴN form checkout (autofill
+// customerName/customerPhone/address) — KHÔNG thay đổi cách Order lưu địa
+// chỉ (Order.address vẫn là snapshot string tại thời điểm đặt hàng, không
+// FK sang bảng này, đúng nguyên tắc snapshot đã áp dụng cho variantColorName).
+model Address {
+  id            String   @id @default(uuid())
+  userId        String
+  recipientName String
+  phone         String
+  address       String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
 }
 
 model AuditLog {
