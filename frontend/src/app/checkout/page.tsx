@@ -6,13 +6,32 @@ import { useCart, getCartLineId } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { api, getApiErrorMessage } from '@/lib/api';
 import { QRCodeSVG } from 'qrcode.react';
+import CheckoutProgress from '@/components/checkout/CheckoutProgress';
 
 type PaymentMethod = 'COD' | 'BANK_TRANSFER';
 
 export default function CheckoutPage() {
-  const { cart, clearCart } = useCart();
+  const { cart, removeLines } = useCart();
   const { user } = useAuth();
   const router = useRouter();
+
+  // ⚡ Cart chọn item riêng để checkout: đọc tập lineId đã tick từ trang giỏ
+  // hàng (bridge qua sessionStorage, cùng cơ chế đã có sẵn cho discountCode).
+  // KHÔNG có (khách vào thẳng /checkout không qua nút bấm ở cart, hoặc
+  // session cũ) -> fallback toàn bộ cart, an toàn cho mọi luồng cũ.
+  const [checkoutLineIds] = useState<string[] | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const saved = sessionStorage.getItem('checkoutLineIds');
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return null;
+    }
+  });
+  const checkoutItems = checkoutLineIds
+    ? cart.filter((item) => checkoutLineIds.includes(getCartLineId(item.id, item.variantId)))
+    : cart;
 
   const [customerName, setCustomerName] = useState(user?.fullName || '');
   const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
@@ -35,7 +54,9 @@ export default function CheckoutPage() {
   const [livePaymentStatus, setLivePaymentStatus] = useState<string | null>(null);
   const [pollTimedOut, setPollTimedOut] = useState(false);
 
-  const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  // ⚡ Tính trên checkoutItems (tập đã chọn ở cart), KHÔNG phải toàn `cart`
+  // — khớp đúng số tiền server sẽ tính (server chỉ tính trên items gửi lên).
+  const subtotal = checkoutItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   // ⚡ Nhóm F: mã giảm giá mang từ trang giỏ hàng sang qua sessionStorage
   // (key `discountCode`, xem cart/page.tsx). Server LUÔN là nguồn sự thật
@@ -81,8 +102,8 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage('');
 
-    if (cart.length === 0) {
-      setErrorMessage('Giỏ hàng của bạn đang trống.');
+    if (checkoutItems.length === 0) {
+      setErrorMessage('Không có sản phẩm nào để đặt hàng.');
       return;
     }
     if (!/^0\d{9}$/.test(customerPhone)) {
@@ -102,7 +123,7 @@ export default function CheckoutPage() {
         customerEmail: customerEmail || undefined,
         address,
         paymentMethod,
-        cart: cart.map((item) => ({
+        cart: checkoutItems.map((item) => ({
           id: item.id,
           variantId: item.variantId,
           quantity: item.quantity,
@@ -115,8 +136,11 @@ export default function CheckoutPage() {
       const res = await api.post('/orders', payload);
       const order = res.data.data;
       setOrderResult(order);
-      clearCart();
+      // ⚡ Chỉ xóa ĐÚNG các dòng vừa đặt (checkoutItems), giữ lại phần
+      // không được chọn ở trang giỏ hàng — KHÁC clearCart() cũ (xóa sạch).
+      removeLines(checkoutItems.map((item) => getCartLineId(item.id, item.variantId)));
       sessionStorage.removeItem('discountCode');
+      sessionStorage.removeItem('checkoutLineIds');
 
       // Nếu chọn chuyển khoản VietQR, tạo QR ngay sau khi đơn hàng được tạo
       if (paymentMethod === 'BANK_TRANSFER') {
@@ -183,6 +207,7 @@ export default function CheckoutPage() {
   if (orderResult) {
     return (
       <div className="min-h-screen bg-white text-[#111] font-sans antialiased pt-16 pb-28 px-6">
+        <CheckoutProgress currentStep={3} />
         <div className="max-w-xl mx-auto bg-white border-2 border-black rounded-none p-8 text-center">
           {/* 🛡️ Hướng B (2026-09-02): VietQR chỉ THỰC SỰ thành công khi
               webhook xác nhận PAID (tiền đã về) — đơn lúc này vẫn PENDING,
@@ -320,6 +345,22 @@ export default function CheckoutPage() {
     );
   }
 
+  // ⚡ Cart chọn item riêng để checkout: giỏ hàng vẫn còn item, nhưng
+  // KHÔNG có item nào được chọn để thanh toán (khách bỏ chọn hết ở /cart
+  // rồi bấm nút, hoặc vào lại /checkout sau khi đã đặt xong phần đã chọn).
+  if (checkoutItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4 px-6">
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
+          Không có sản phẩm nào được chọn để thanh toán.
+        </p>
+        <Link href="/cart" className="bg-black text-white px-8 py-3.5 rounded-none text-xs font-bold uppercase tracking-[0.2em] hover:bg-gray-800 transition">
+          Quay lại giỏ hàng
+        </Link>
+      </div>
+    );
+  }
+
   // ── Form thanh toán ─────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white text-[#111] font-sans antialiased pb-28">
@@ -328,6 +369,7 @@ export default function CheckoutPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 pt-8">
+        <CheckoutProgress currentStep={2} />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           {/* Cột trái: Form thông tin */}
           <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-6">
@@ -431,11 +473,11 @@ export default function CheckoutPage() {
           <div className="lg:col-span-5">
             <div className="bg-white border border-gray-200 rounded-none p-6 sticky top-6">
               <h2 className="text-[11px] uppercase tracking-widest font-bold text-gray-400 border-b border-gray-100 pb-3 mb-4">
-                Đơn hàng của bạn ({cart.reduce((a, c) => a + c.quantity, 0)} sản phẩm)
+                Đơn hàng của bạn ({checkoutItems.reduce((a, c) => a + c.quantity, 0)} sản phẩm)
               </h2>
 
               <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
-                {cart.map((item) => {
+                {checkoutItems.map((item) => {
                   const lineId = getCartLineId(item.id, item.variantId);
                   return (
                     <div key={lineId} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-none">

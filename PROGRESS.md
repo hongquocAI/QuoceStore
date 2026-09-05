@@ -18,6 +18,52 @@
 
 ### Đang làm / Việc tiếp theo ngay
 
+**✅ Cart chọn item riêng để checkout + Checkout progress-step — ĐÃ ĐÓNG
+HOÀN TOÀN (2026-09-05), người dùng đã test UI thật PASS 6/6 bước.**
+
+4 quyết định đã chốt qua AskUserQuestion trước khi code: tick chọn 1 phần
+giỏ để thanh toán (phần không tick vẫn giữ lại), subtotal/discount ở trang
+Giỏ hàng tính trên item ĐÃ CHỌN (không phải toàn giỏ — khớp đúng số tiền
+server tính), có checkbox "Chọn tất cả", progress-step CHỈ là UI hiển thị
+tĩnh trên `/checkout` hiện có (không tách trang, không đổi logic nghiệp vụ).
+
+- `frontend/src/context/CartContext.tsx` — export `CartItem` interface +
+  thêm 1 hàm mới `removeLines(lineIds[])` (xóa chọn lọc nhiều dòng, khác
+  `clearCart()` xóa sạch). Không đổi hành vi cũ của bất kỳ hàm nào khác.
+- `frontend/src/app/cart/page.tsx` — state `selectedIds` cục bộ (không đưa
+  vào CartContext toàn cục, tránh ảnh hưởng badge giỏ hàng ở `Header.tsx`).
+  Mặc định chọn hết khi cart load/khi thêm sản phẩm mới; xóa sản phẩm tự
+  rời khỏi selection. Checkbox từng dòng + "Chọn tất cả"; item không chọn
+  bị làm mờ (`opacity-50`) nhưng vẫn thao tác được. `subtotal`/discount/tổng
+  tiền tính trên `selectedItems`. Nút "Tiến hành thanh toán" disable khi
+  chưa chọn gì; lưu `sessionStorage['checkoutLineIds']` (cùng cơ chế bridge
+  đã có cho `discountCode`) trước khi điều hướng sang `/checkout`.
+- `frontend/src/components/checkout/CheckoutProgress.tsx` (mới) — stepper 3
+  bước thuần hiển thị (Giỏ hàng → Thanh toán → Hoàn tất), tái dùng nguyên
+  văn design token của stepper `SHIPPING_STATUS_ORDER` đã có ở
+  `orders/page.tsx` (không sửa `orderLabels.ts` — đây là stepper khác).
+- `frontend/src/app/checkout/page.tsx` — đọc `checkoutLineIds` từ
+  sessionStorage → `checkoutItems = cart.filter(...)` (fallback = toàn
+  `cart` nếu không có, an toàn cho luồng cũ/link cũ). Thay `subtotal`, payload
+  `POST /orders`, danh sách item cột phải từ `cart` → `checkoutItems`. Sau
+  khi đặt hàng thành công: `clearCart()` → `removeLines(checkoutItems...)`
+  (chỉ xóa đúng phần vừa đặt, giữ lại phần không tick). Thêm guard mới:
+  `checkoutItems.length === 0 && cart.length > 0` → thông báo "chưa chọn gì"
+  + link quay lại `/cart` (khác thông báo "giỏ trống" cũ).
+  **Giữ nguyên 100%**: thứ tự early-return `orderResult` trước
+  `cart.length===0`, polling effect deps `[orderResult, paymentMethod]`,
+  toàn bộ luồng COD/VietQR/webhook/trừ kho. **Backend không đổi gì**
+  (`CreateOrderDto.cart` đã validate từng item độc lập, gửi ít hơn vẫn hợp lệ).
+- Đã tự verify: `tsc --noEmit` + `npm run build` sạch sau mỗi file sửa.
+  Người dùng ngồi theo dõi trực tiếp, duyệt từng edit, tự test UI thật PASS
+  6/6 bước (chọn/bỏ chọn từng item, "Chọn tất cả", checkout 1 phần, giỏ giữ
+  lại đúng phần không chọn sau khi đặt hàng, VietQR/polling không bị ảnh
+  hưởng, stepper hiện đúng bước).
+
+Không còn hạng mục "cần người dùng kiểm tra" nào treo cho tính năng này.
+
+### (Lịch sử — Review sản phẩm, đã đóng hoàn toàn 2026-09-05)
+
 **✅ Review sản phẩm (mục treo #2 của Nhóm G) — ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05),
 người dùng đã test UI thật PASS 6/6 bước.**
 
@@ -2160,3 +2206,31 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
 - Kết luận: mục treo #2 (Review sản phẩm) của Nhóm G **ĐÃ ĐÓNG HOÀN TOÀN**,
   không còn hạng mục nào treo lại cho tính năng này ngoài phân trang review
   (chưa có đủ dữ liệu thật để test, không phải bug).
+
+### [2026-09-05] Đã hoàn thành: Cart chọn item riêng để checkout + Checkout progress-step
+- **File đã sửa/tạo**:
+  - `frontend/src/context/CartContext.tsx` — export `CartItem`, thêm hàm
+    `removeLines(lineIds[])`.
+  - `frontend/src/app/cart/page.tsx` — selection state, checkbox từng dòng +
+    "Chọn tất cả", subtotal/discount tính trên item đã chọn, lưu
+    `sessionStorage['checkoutLineIds']`.
+  - `frontend/src/components/checkout/CheckoutProgress.tsx` (mới) — stepper
+    3 bước thuần hiển thị.
+  - `frontend/src/app/checkout/page.tsx` — đọc `checkoutLineIds`, tính toán
+    trên `checkoutItems`, `removeLines()` thay `clearCart()` sau khi đặt
+    hàng, guard "chưa chọn gì" mới, chèn `CheckoutProgress`.
+- **Người dùng đã theo dõi trực tiếp** (chế độ duyệt từng edit thủ công,
+  không auto mode) — khảo sát kỹ 3 file trước khi sửa qua Plan Mode +
+  AskUserQuestion xác nhận 4 quyết định thiết kế trước khi code.
+- **Đã test**: `npx tsc --noEmit` + `npm run build` sạch sau mỗi bước. Người
+  dùng test UI thật PASS 6/6: chọn/bỏ chọn từng item đúng, "Chọn tất cả"
+  toggle đúng + disable nút khi không chọn gì, checkout 1 phần chỉ gửi đúng
+  phần đã chọn, giỏ giữ lại đúng phần không chọn sau khi đặt hàng thành
+  công, luồng VietQR/polling không bị ảnh hưởng, stepper hiện đúng bước
+  (2 khi điền form, 3 khi xác nhận đơn).
+- **Lưu ý/vấn đề gặp phải**: không phát sinh bug — thiết kế tối thiểu hóa
+  thay đổi (selection state cục bộ ở trang cart, không đưa vào CartContext
+  toàn cục) giúp tránh ảnh hưởng các nơi khác đang dùng `cart.length`/
+  `cart.reduce` (VD badge Header). Backend không cần đổi gì.
+- Kết luận: Đợt 4 Nhóm G **HOÀN TẤT THÊM 1 MỤC**, chỉ còn "Sổ địa chỉ nhiều
+  địa chỉ" là mục treo cuối cùng của Nhóm G.

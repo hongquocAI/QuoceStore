@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCart, getCartLineId } from '@/context/CartContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,7 +15,49 @@ export default function CartPage() {
   const [couponMessage, setCouponMessage] = useState('');
   const [appliedCodeName, setAppliedCodeName] = useState('');
 
-  const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  // ⚡ Chọn item riêng để checkout: mặc định TẤT CẢ được chọn khi giỏ hàng
+  // tải xong (kể cả lần load đầu từ localStorage), item MỚI thêm vào trong
+  // lúc đang mở trang cũng tự động được chọn. Item bị xóa tự rời khỏi
+  // selection vì chỉ lặp trên `currentIds` (những id còn tồn tại thật).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const knownIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const currentIds = new Set(cart.map((item) => getCartLineId(item.id, item.variantId)));
+    setSelectedIds((prev) => {
+      const next = new Set<string>();
+      currentIds.forEach((id) => {
+        if (prev.has(id) || !knownIdsRef.current.has(id)) next.add(id);
+      });
+      return next;
+    });
+    knownIdsRef.current = currentIds;
+  }, [cart]);
+
+  const selectedItems = cart.filter((item) => selectedIds.has(getCartLineId(item.id, item.variantId)));
+  const allSelected = cart.length > 0 && selectedIds.size === cart.length;
+
+  const toggleSelect = (lineId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId);
+      else next.add(lineId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(cart.map((item) => getCartLineId(item.id, item.variantId))));
+    }
+  };
+
+  // ⚡ Subtotal/discount/tổng tiền tính trên ITEM ĐÃ CHỌN (không phải toàn
+  // giỏ) — khớp đúng số tiền server sẽ tính khi chỉ gửi tập item đã chọn
+  // lên POST /orders (xem checkout/page.tsx).
+  const subtotal = selectedItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const discountAmount = subtotal * discount;
   const finalTotal = subtotal - discountAmount;
 
@@ -73,15 +115,33 @@ const handleApplyCoupon = async () => {
           {/* Cột trái: Danh sách sản phẩm trong giỏ */}
           <div className="lg:col-span-8 space-y-6">
             <div className="bg-white border border-gray-200 rounded-none p-6 space-y-4">
-              <h2 className="text-[11px] uppercase tracking-widest font-bold text-gray-400 border-b border-gray-100 pb-3">
-                Chi tiết sản phẩm ({cart.reduce((a, c) => a + c.quantity, 0)} sản phẩm)
-              </h2>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h2 className="text-[11px] uppercase tracking-widest font-bold text-gray-400">
+                  Chi tiết sản phẩm ({cart.reduce((a, c) => a + c.quantity, 0)} sản phẩm)
+                </h2>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 accent-black cursor-pointer"
+                  />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700">Chọn tất cả</span>
+                </label>
+              </div>
 
               {cart.map((item) => {
                 const lineId = getCartLineId(item.id, item.variantId);
+                const isSelected = selectedIds.has(lineId);
                 return (
-                  <div key={lineId} className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-b border-gray-100 last:border-none">
+                  <div key={lineId} className={`flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-b border-gray-100 last:border-none transition-opacity ${isSelected ? '' : 'opacity-50'}`}>
                     <div className="flex items-center gap-4 w-full sm:w-auto">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(lineId)}
+                        className="w-4 h-4 accent-black cursor-pointer flex-shrink-0"
+                      />
                       <div className="w-20 h-20 bg-[#f4f4f4] rounded-none overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200/80">
                         {item.image ? (
                           <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
@@ -193,6 +253,7 @@ const handleApplyCoupon = async () => {
               </div>
 
               <button
+                disabled={selectedItems.length === 0}
                 onClick={() => {
                   // ⚡ Nhóm F: trước đây chỉ lưu % và tổng tiền đã tính sẵn ở
                   // đây — nhưng KHÔNG lưu mã code, và trang checkout không hề
@@ -206,12 +267,21 @@ const handleApplyCoupon = async () => {
                   } else {
                     sessionStorage.removeItem('discountCode'); // tránh sót mã cũ từ lần trước
                   }
+                  // ⚡ Cart chọn item riêng để checkout: truyền đúng tập
+                  // lineId đã tick sang /checkout — cùng cơ chế bridge
+                  // sessionStorage đã có sẵn cho discountCode.
+                  sessionStorage.setItem('checkoutLineIds', JSON.stringify(Array.from(selectedIds)));
                   router.push('/checkout');
                 }}
-                className="w-full bg-black text-white py-4 rounded-none uppercase tracking-[0.2em] text-xs font-bold hover:bg-gray-800 transition text-center block"
+                className="w-full bg-black text-white py-4 rounded-none uppercase tracking-[0.2em] text-xs font-bold hover:bg-gray-800 transition text-center block disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Tiến hành thanh toán
               </button>
+              {selectedItems.length === 0 && (
+                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600 text-center">
+                  Vui lòng chọn ít nhất 1 sản phẩm để thanh toán
+                </p>
+              )}
             </div>
 
           </div>

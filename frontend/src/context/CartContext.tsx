@@ -1,7 +1,9 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-interface CartItem {
+// ⚡ Export ra ngoài để cart/page.tsx dùng chung khi quản lý selection
+// (chọn item riêng để checkout) — tránh định nghĩa lại type trùng lặp.
+export interface CartItem {
   id: string; // productId
   variantId?: string; // ⚡ MỚI: id của ProductVariant nếu khách chọn màu cụ thể
   variantColorName?: string; // ⚡ MỚI: tên màu hiển thị, để show trong giỏ hàng/đơn hàng
@@ -33,6 +35,10 @@ interface CartContextType {
   updateQuantity: (cartLineId: string, quantity: number) => void;
   removeFromCart: (cartLineId: string) => void;
   clearCart: () => void;
+  // ⚡ Cart chọn item riêng để checkout: xóa CHỌN LỌC nhiều dòng cùng lúc
+  // (dùng sau khi đặt hàng thành công 1 phần giỏ), KHÁC clearCart() —
+  // clearCart() xóa sạch, hàm này chỉ xóa đúng các lineId được truyền vào.
+  removeLines: (lineIds: string[]) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -121,8 +127,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   const clearCart = () => setCart([]);
 
+  const removeLines = (lineIds: string[]) => {
+    const idSet = new Set(lineIds);
+    setCart((prevCart) => prevCart.filter((item) => !idSet.has(getCartLineId(item.id, item.variantId))));
+  };
+
   return (
-    <CartContext.Provider value={{ cart, addToCart, updateQuantity, removeFromCart, clearCart }}>
+    <CartContext.Provider value={{ cart, addToCart, updateQuantity, removeFromCart, clearCart, removeLines }}>
       {children}
     </CartContext.Provider>
   );

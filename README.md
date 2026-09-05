@@ -10,8 +10,11 @@ depth), khả năng mở rộng, và khả năng quan sát hệ thống (observa
 - Duyệt sản phẩm theo danh mục/danh mục con/thương hiệu, xem chi tiết với
   biến thể màu sắc (giá & tồn kho riêng theo từng màu), và gợi ý **sản phẩm
   liên quan** cùng danh mục con
-- Giỏ hàng, áp mã giảm giá (server tự validate + tự tính lại số tiền giảm,
-  không tin số liệu từ client)
+- Giỏ hàng cho phép **chọn riêng từng sản phẩm để thanh toán** (tick chọn,
+  có "Chọn tất cả") — sản phẩm không chọn vẫn giữ lại trong giỏ; áp mã giảm
+  giá (server tự validate + tự tính lại số tiền giảm, không tin số liệu từ
+  client); trang thanh toán có **thanh tiến trình** (Giỏ hàng → Thanh toán →
+  Hoàn tất)
 - Đặt hàng có tài khoản hoặc **Guest checkout** (không cần đăng ký) — khách
   vãng lai tra cứu lại đơn hàng bằng mã đơn + số điện thoại
   (`/orders/lookup`), có rate-limit chống dò quét

@@ -397,14 +397,37 @@ tả gốc dưới đây, xem PROGRESS.md để biết chi tiết chính xác t�
    `orders`/`register`/`login` đều đã áp dụng đúng style thống nhất này.
 3. ✅ **G2 ĐÃ XONG (2026-09-02)** — dynamic list Highlights/Specs Admin
    Products (xem mục G2 bên dưới).
-4. ✅ **Đợt 4 (feature gap) — 4/8 việc ĐÃ XONG, 3/8 việc TREO LẠI, 1/8 ĐÃ
-   ĐÓNG (2026-09-05)**: ĐÃ làm Category Admin CRUD, Header mobile nav, orders
-   timeline trực quan, sản phẩm liên quan (2026-09-02). **Review sản phẩm
-   ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05)** — xem mục riêng ngay dưới đây. Còn TREO
-   LẠI (cần người dùng quyết định kiến trúc): cart chọn item riêng để
-   checkout, checkout progress-step, sổ địa chỉ (cần bảng `Address` + tích
-   hợp checkout). Chi tiết đầy đủ xem PROGRESS.md `[2026-09-02]` mục "Đợt 4
-   Nhóm G".
+4. ✅ **Đợt 4 (feature gap) — 6/8 việc ĐÃ XONG, 1/8 TREO LẠI (2026-09-05)**:
+   ĐÃ làm Category Admin CRUD, Header mobile nav, orders timeline trực quan,
+   sản phẩm liên quan (2026-09-02); Review sản phẩm (2026-09-05); Cart chọn
+   item riêng để checkout + Checkout progress-step (2026-09-05) — xem 2 mục
+   riêng ngay dưới đây. Còn TREO LẠI DUY NHẤT: sổ địa chỉ nhiều địa chỉ (cần
+   bảng `Address` + tích hợp checkout). Chi tiết đầy đủ xem PROGRESS.md
+   `[2026-09-02]` mục "Đợt 4 Nhóm G".
+
+### ✅ Cart chọn item riêng để checkout + Checkout progress-step ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05)
+
+4 quyết định đã chốt qua AskUserQuestion trước khi code: tick chọn 1 phần
+giỏ để thanh toán (phần không tick vẫn giữ lại), subtotal/discount ở trang
+Giỏ hàng tính trên item ĐÃ CHỌN (không phải toàn giỏ), có checkbox "Chọn tất
+cả", progress-step CHỈ là UI hiển thị tĩnh (không tách trang, không đổi
+logic nghiệp vụ).
+
+- `CartContext.tsx`: export `CartItem` + thêm `removeLines(lineIds[])` (xóa
+  chọn lọc, khác `clearCart()` xóa sạch) — không đổi hàm nào khác.
+- Selection state nằm CỤC BỘ ở `cart/page.tsx` (không đưa vào CartContext
+  toàn cục) — tránh ảnh hưởng badge giỏ hàng ở `Header.tsx` hay bất kỳ nơi
+  nào khác đang dùng `cart.length`/`cart.reduce`.
+- `checkout/page.tsx`: đọc `sessionStorage['checkoutLineIds']` (bridge cùng
+  cơ chế đã có cho `discountCode`) → `checkoutItems` (fallback = toàn `cart`
+  nếu thiếu, an toàn cho luồng cũ). Sau khi đặt hàng: `removeLines()` thay
+  `clearCart()` — chỉ xóa đúng phần vừa đặt. **Giữ nguyên 100%**: thứ tự
+  early-return `orderResult` trước `cart.length===0`, polling effect deps,
+  toàn bộ luồng COD/VietQR/webhook/trừ kho. Backend không đổi gì.
+- `components/checkout/CheckoutProgress.tsx` (mới): stepper 3 bước thuần
+  hiển thị, tái dùng token design của stepper `SHIPPING_STATUS_ORDER` đã có.
+- Người dùng ngồi theo dõi trực tiếp, duyệt từng edit, test UI thật PASS
+  6/6 bước. Không còn mục treo nào cho tính năng này.
 
 ### ✅ Review sản phẩm ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05, backend + frontend)
 
