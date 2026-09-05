@@ -18,8 +18,8 @@
 
 ### Đang làm / Việc tiếp theo ngay
 
-**✅ Review sản phẩm (mục treo #2 của Nhóm G) — BACKEND + FRONTEND ĐÃ XONG
-(2026-09-05), CHỜ NGƯỜI DÙNG TEST UI BẰNG MẮT (chưa test).**
+**✅ Review sản phẩm (mục treo #2 của Nhóm G) — ĐÃ ĐÓNG HOÀN TOÀN (2026-09-05),
+người dùng đã test UI thật PASS 6/6 bước.**
 
 5 quyết định kiến trúc người dùng đã chốt trước: chỉ khách ĐÃ MUA (verify qua
 `OrderItem`) mới được review, không kiểm duyệt (hiện ngay), điểm TB tính
@@ -60,30 +60,18 @@ chính mình, unique 1 review/user/product. Module hoàn toàn ĐỘC LẬP — 
   người khác). Đã dọn sạch order + review test khỏi DB trước khi báo hoàn
   thành (xác nhận lại bằng query: `reviews còn lại: 0`, `order test còn sót: 0`).
 
-**🔍 CẦN NGƯỜI DÙNG TỰ TEST UI BẰNG MẮT (chưa test)**:
-1. Vào `/product/[slug]` bất kỳ — xác nhận section "Đánh giá sản phẩm" hiện
-   đúng vị trí (giữa thông tin sản phẩm và "Sản phẩm liên quan"), điểm TB +
-   phân bố sao hiển thị đúng khi chưa có review nào (hiện "—" và "Chưa có
-   đánh giá nào").
-2. Chưa đăng nhập → xác nhận thấy dòng "Đăng nhập để đánh giá sản phẩm này".
-3. Đăng nhập bằng tài khoản CHƯA mua sản phẩm đó → xác nhận thấy "Bạn cần
-   mua và nhận sản phẩm này trước khi đánh giá."
-4. Để test được luồng viết review thật: vào `/admin/orders`, tìm 1 đơn của
-   tài khoản bạn đang dùng để test, chuyển `shippingStatus` lên `DELIVERED`
-   (qua đúng state machine: PENDING→PROCESSING→SHIPPED→DELIVERED) cho sản
-   phẩm muốn review, rồi quay lại trang sản phẩm đó — xác nhận form "Viết
-   đánh giá" hiện ra, chọn sao + nhập bình luận + Gửi → review hiện ngay lập
-   tức trong danh sách (không cần F5), điểm TB cập nhật đúng.
-5. Bấm "Sửa" trên đánh giá của mình → đổi sao/bình luận → Cập nhật → xác
-   nhận đổi đúng. Bấm "Xóa" → xác nhận `ConfirmModal` hiện, xóa xong review
-   biến mất khỏi danh sách + điểm TB cập nhật lại.
-6. Thử gửi review lần 2 cho cùng sản phẩm (F5 lại trang) → xác nhận form ẩn
-   đi, hiện lại đúng đánh giá đã gửi (không cho gửi trùng).
-7. Phân trang: nếu 1 sản phẩm có > 10 review mới thấy nút Trước/Sau — không
-   bắt buộc test nếu chưa có đủ dữ liệu thật, để dành khi catalog lớn hơn.
+**✅ Người dùng đã test UI thật PASS 6/6 bước (2026-09-05)**:
+1-2. Gửi review: PASS, đúng như mô tả.
+3. Sửa review: PASS, cập nhật ngay lập tức không cần F5.
+4. Xóa review: PASS, `ConfirmModal` hoạt động đúng.
+5. Guest (chưa đăng nhập): PASS, thấy danh sách nhưng không có form, có dòng
+   mời đăng nhập.
+6. Tài khoản chưa mua sản phẩm: PASS, nhận đúng thông báo "cần mua sản phẩm
+   để đánh giá".
 
-**Nếu phát hiện lỗi khi test UI**: mô tả cụ thể bước tái hiện, KHÔNG tự sửa
-vội — quay lại hỏi để xác nhận đúng nguyên nhân trước khi đổi code.
+Không còn mục "cần người dùng kiểm tra" nào treo cho tính năng này. Phân
+trang review (>10 review/sản phẩm) chưa có dữ liệu thật để test — để dành
+khi catalog/lượng review lớn hơn, không phải bug hay việc thiếu.
 
 ### (Lịch sử — các mục dưới đây vẫn đúng, giữ nguyên để tra cứu)
 
@@ -2157,3 +2145,18 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
     thay vì nới lỏng throttle.
   - CHƯA test UI thật bằng mắt — xem mục "🔍 CẦN NGƯỜI DÙNG TỰ TEST UI BẰNG
     MẮT" ở phần Trạng thái hiện tại đầu file.
+
+### [2026-09-05] Review sản phẩm — người dùng test UI thật PASS 6/6, ĐÓNG HOÀN TOÀN
+- **Đã test** (người dùng tự thực hiện qua UI thật, không phải script):
+  1-2. Gửi review: PASS, đúng như mô tả.
+  3. Sửa review: PASS, cập nhật ngay lập tức không cần F5.
+  4. Xóa review: PASS, `ConfirmModal` hoạt động đúng.
+  5. Guest (chưa đăng nhập): PASS, thấy danh sách nhưng không có form, có
+     dòng mời đăng nhập.
+  6. Tài khoản chưa mua sản phẩm: PASS, nhận đúng thông báo "cần mua sản
+     phẩm để đánh giá".
+- **Lưu ý/vấn đề gặp phải**: không phát sinh bug nào qua test UI thật — toàn
+  bộ hành vi khớp đúng thiết kế đã verify qua script API trước đó.
+- Kết luận: mục treo #2 (Review sản phẩm) của Nhóm G **ĐÃ ĐÓNG HOÀN TOÀN**,
+  không còn hạng mục nào treo lại cho tính năng này ngoài phân trang review
+  (chưa có đủ dữ liệu thật để test, không phải bug).

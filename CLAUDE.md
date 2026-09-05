@@ -431,8 +431,10 @@ chính mình, unique 1 review/user/product. Module hoàn toàn ĐỘC LẬP — 
   phẩm và "Sản phẩm liên quan".
 - Đã tự verify: `tsc --noEmit` + `npm run build` sạch cả 2 phía; test API
   thật qua script Node (JWT tự ký) — 16/16 ca đúng kỳ vọng, không lộ email
-  user trong response public, đã dọn sạch dữ liệu test. **CHƯA test UI bằng
-  mắt** — xem PROGRESS.md mục "🔍 CẦN NGƯỜI DÙNG TỰ TEST UI BẰNG MẮT".
+  user trong response public, đã dọn sạch dữ liệu test. **Người dùng đã test
+  UI thật PASS 6/6 bước (2026-09-05)**: gửi/sửa/xóa review, guest thấy danh
+  sách + dòng mời đăng nhập (không có form), tài khoản chưa mua nhận đúng
+  thông báo. Không còn mục treo nào cho tính năng này.
 
 **Bối cảnh — đổi thứ tự ưu tiên toàn dự án:** Người dùng đã xác nhận
 (2026-08-31) mục tiêu chính hiện tại là tạo 1 project HOÀN CHỈNH, ĐẸP để
