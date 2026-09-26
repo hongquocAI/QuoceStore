@@ -28,9 +28,13 @@ export class CartItemDto {
 }
 
 export class CreateOrderDto {
-  @IsOptional()
-  @IsString()
-  userId?: string;
+  // 🛡️ FIX LỖ HỔNG NGHIÊM TRỌNG (đã xóa field `userId` khỏi DTO): trước đây
+  // client tự khai userId trong body, server tin thẳng -> ai cũng có thể gửi
+  // userId của người khác (lộ qua GET /reviews công khai) để chèn đơn hàng
+  // giả vào lịch sử /orders của nạn nhân. Giờ userId CHỈ lấy từ JWT đã verify
+  // chữ ký qua OptionalJwtAuthGuard (xem OrdersController.create()), không
+  // bao giờ đọc từ body — whitelist:true sẽ tự loại bỏ field `userId` nếu
+  // client cố tình gửi kèm.
 
   @IsNotEmpty({ message: 'Họ tên không được để trống' })
   @IsString()

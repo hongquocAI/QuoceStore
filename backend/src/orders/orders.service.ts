@@ -29,15 +29,14 @@ export class OrdersService {
     private discountsService: DiscountsService,
   ) {}
 
-  async create(createOrderDto: CreateOrderDto) {
-    let targetUserId = createOrderDto.userId;
+  async create(createOrderDto: CreateOrderDto, authenticatedUserId?: string) {
+    // 🛡️ FIX LỖ HỔNG: userId giờ CHỈ đến từ JWT đã verify chữ ký
+    // (OptionalJwtAuthGuard -> req.user.id), không bao giờ đọc từ body nữa.
+    // Không cần check user tồn tại/active ở đây nữa — JwtStrategy.validate()
+    // đã tự làm việc đó (query DB + check isActive) trước khi gắn req.user.
+    let targetUserId = authenticatedUserId;
 
-    if (targetUserId) {
-      const userExists = await this.prisma.user.findUnique({ where: { id: targetUserId } });
-      if (!userExists) {
-        throw new BadRequestException('Tài khoản không tồn tại hoặc phiên đăng nhập đã hết hạn.');
-      }
-    } else {
+    if (!targetUserId) {
       const guestUser = await this.prisma.user.upsert({
         where: { email: 'guest@quoce.vn' },
         update: {},
