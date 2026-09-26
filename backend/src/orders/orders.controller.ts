@@ -2,6 +2,7 @@ import { Controller, Get, Param, Patch, Post, Body, Query, Req, UseGuards } from
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -16,9 +17,17 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   // Public: khách vãng lai (guest) vẫn đặt hàng được không cần đăng nhập.
+  // 🛡️ FIX LỖ HỔNG: trước đây DTO nhận thẳng `userId` do CLIENT tự khai
+  // trong body — ai cũng có thể gửi userId của người khác (lấy được từ
+  // GET /reviews công khai, API này trả kèm user.id) để chèn đơn hàng giả
+  // vào lịch sử /orders của nạn nhân. Giờ dùng OptionalJwtAuthGuard: có
+  // cookie accessToken hợp lệ -> LUÔN lấy userId từ req.user (đã verify chữ
+  // ký), không có cookie -> guest, KHÔNG bao giờ đọc userId từ body nữa
+  // (field `userId` đã bị xóa khỏi CreateOrderDto).
+  @UseGuards(OptionalJwtAuthGuard)
   @Post()
-  async create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
+  async create(@Body() createOrderDto: CreateOrderDto, @Req() req: any) {
+    return this.ordersService.create(createOrderDto, req.user?.id);
   }
 
   // 🛡️ FIX NGHIÊM TRỌNG: đã xóa toàn bộ logic tự viết `jwt.verify(...)` rồi

@@ -185,10 +185,16 @@ gửi có phần tử → thay thế toàn bộ.
   PrismaHealthIndicator chạy SELECT 1), loại trừ khỏi rate-limit
 - Graceful shutdown: app.enableShutdownHooks() (PrismaService đã có sẵn
   onModuleDestroy từ đầu dự án)
-- Sentry: Sentry.init() trong main.ts (SỚM NHẤT, ngay sau khi có
-  configService, trước mọi middleware khác), GlobalExceptionFilter gọi
-  Sentry.captureException() CHỈ với lỗi 500 thật (không phải lỗi nghiệp vụ
-  400/401/403)
+- Sentry: Sentry.init() trong main.ts (SỚM NHẤT, ngay sau khi có app +
+  configService, trước mọi middleware khác, chỉ khi có `SENTRY_DSN`).
+  ⚠️ **SAI LỆCH đã phát hiện qua audit code thật (2026-09-26) — mục này
+  trước đây ghi sai**: `GlobalExceptionFilter` (`common/filters/`) HIỆN
+  KHÔNG gọi `Sentry.captureException()` ở đâu cả — chỉ `main.ts` gọi
+  `Sentry.init()`, không file nào khác import `@sentry/node`. Nghĩa là lỗi
+  500 thật hiện KHÔNG được báo về Sentry dù DSN đã cấu hình. Cần nối
+  `Sentry.captureException()` vào nhánh lỗi 500 của `GlobalExceptionFilter`
+  nếu muốn dùng Sentry đúng mục đích (đã ghi vào PROGRESS.md Known Issues,
+  chưa sửa).
 
 ### Nhóm B — Sẵn sàng chịu tải (100% XONG)
 - ✅ Redis cache (Upstash, qua @nestjs/cache-manager + @keyv/redis, dùng
@@ -346,10 +352,19 @@ sau khi đã thêm `minPrice`/`maxPrice` vào `QueryProductDto`.
 ### 2. Nhóm F — Hoàn thiện nghiệp vụ còn dang dở
 - ✅ ĐÃ XONG — Nối Discount thật vào OrdersService.create(). Xem mô tả chi
   tiết ở mục "ĐÃ HOÀN THÀNH" phía trên (sẽ thêm ngay dưới đây).
-- Dùng bảng AuditLog (đã có trong schema, chưa từng ghi gì): tạo 1
-  AuditLogInterceptor hoặc ghi thủ công trong các action nhạy cảm (Admin
-  xóa/sửa Product, đổi trạng thái Order, xóa User...) — ghi userId, action,
-  ipAddress, userAgent
+- ✅ ĐÃ XONG (2026-08-30, mục này trước đây ghi sai là chưa làm — đã sửa lại
+  2026-09-26 sau khi audit code thật phát hiện sai lệch) — `AuditLogInterceptor`
+  (`backend/src/common/interceptors/audit-log.interceptor.ts`) đăng ký
+  `APP_INTERCEPTOR` toàn cục trong `app.module.ts`, chỉ ghi trên route có
+  decorator `@Audit(action, entityType)` (21 route đang dùng). Ghi userId,
+  action, entityType, entityId (từ `params.id` hoặc `response.id`),
+  metadata (redact password/token/cccd...), IP, user agent; ghi cả khi
+  request thất bại. Write kiểu fire-and-forget (`void`), lỗi ghi log chỉ log
+  chứ không làm fail request gốc. Thêm 1 điểm ghi trực tiếp ngoài
+  interceptor: `PAYMENT_STOCK_CONFLICT` trong `payment.service.ts` khi
+  webhook trừ kho bị clamp do không đủ tồn kho thật. **Chưa có** endpoint
+  hay trang Admin nào để XEM audit log — hiện chỉ ghi, không có màn đọc lại
+  (ghi vào Known Issues nếu cần làm tiếp).
 - ✅ ĐÃ XONG — Trang quản lý đơn hàng Admin (`/admin/orders`). Xem mô tả chi
   tiết ở mục "ĐÃ HOÀN THÀNH → Nhóm F (phần 2)" phía trên.
 
@@ -398,7 +413,10 @@ tả gốc dưới đây, xem PROGRESS.md để biết chi tiết chính xác t�
 3. ✅ **G2 ĐÃ XONG (2026-09-02)** — dynamic list Highlights/Specs Admin
    Products (xem mục G2 bên dưới).
 4. ✅ **Đợt 4 (feature gap) — 8/8 việc ĐÃ XONG (2026-09-05) — TOÀN BỘ ĐÓNG**:
-   ĐÃ làm Category Admin CRUD, Header mobile nav, orders timeline trực quan,
+   ĐÃ làm Category CRUD (⚠️ làm rõ 2026-09-26 sau audit: chỉ là API
+   `POST/DELETE /categories` + quick-add trong form sản phẩm Admin — KHÔNG
+   có trang `/admin/categories` riêng để xem danh sách/sửa; y hệt cách
+   Brand/SubCategory đã làm trước đó), Header mobile nav, orders timeline trực quan,
    sản phẩm liên quan (2026-09-02); Review sản phẩm (2026-09-05); Cart chọn
    item riêng để checkout + Checkout progress-step (2026-09-05); Sổ địa chỉ
    nhiều địa chỉ (2026-09-05, backend+frontend xong, CHỜ người dùng test UI

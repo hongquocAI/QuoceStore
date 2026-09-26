@@ -1,0 +1,23 @@
+flowchart TB
+    REQ(["Request: PATCH /products/:id<br/>(Admin sửa sản phẩm)"])
+
+    L1["<b>Lớp 1 — Hạ tầng HTTP</b><br/>helmet (security headers)<br/>CORS (chỉ FRONTEND_URL)<br/>cookie-parser"]
+    L2["<b>Lớp 2 — Rate Limiting</b><br/>ThrottlerGuard: 100 req / 60s / IP<br/>(global, một số route nhạy cảm có limit riêng)"]
+    L3["<b>Lớp 3 — Validate đầu vào</b><br/>ValidationPipe: whitelist:true<br/>forbidNonWhitelisted:true, transform:true<br/>→ field lạ / sai kiểu bị từ chối 400 NGAY,<br/>chưa chạm tới Controller"]
+    L4["<b>Lớp 4 — Xác thực (AuthN)</b><br/>JwtAuthGuard: đọc accessToken từ<br/>Cookie HttpOnly, verify chữ ký JWT_SECRET<br/>→ 401 nếu thiếu/sai/hết hạn"]
+    L5["<b>Lớp 5 — Phân quyền (AuthZ)</b><br/>RolesGuard + @Roles(ADMIN)<br/>→ 403 nếu role không khớp"]
+    L6["<b>Lớp 6 — Nghiệp vụ trong Service</b><br/>Validate FK (category/subCategory/brand tồn tại)<br/>Slug bất biến (không có trong UpdateProductDto)<br/>Kiểm tra SKU trùng"]
+    L7["<b>Lớp 7 — Ghi log & chuẩn hoá lỗi</b><br/>AuditLogInterceptor: ghi userId, action,<br/>entityId, IP, user agent (redact field nhạy cảm)<br/>GlobalExceptionFilter: chuẩn hoá mọi lỗi trả về"]
+
+    RESULT(["200 OK — sản phẩm đã cập nhật"])
+
+    REQ --> L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7 --> RESULT
+
+    L3 -.->|"400 Bad Request"| FAIL1(["Từ chối - dừng ngay"])
+    L4 -.->|"401 Unauthorized"| FAIL2(["Từ chối - dừng ngay"])
+    L5 -.->|"403 Forbidden"| FAIL3(["Từ chối - dừng ngay"])
+    L6 -.->|"400/404/409"| FAIL4(["Từ chối - qua Lớp 7 để log + chuẩn hoá"])
+    FAIL4 --> L7
+
+    note1["Route Customer (vd PATCH /addresses/:id)<br/>thay Lớp 5 bằng kiểm tra OWNERSHIP<br/>trong Service: chỉ chủ tài nguyên mới<br/>được thao tác, không cần role cụ thể"]
+    L5 -.- note1

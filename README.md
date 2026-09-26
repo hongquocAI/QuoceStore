@@ -111,9 +111,11 @@ quoce-store/
 │   │   ├── orders/                        # Đơn hàng & trạng thái giao hàng
 │   │   ├── discounts/                       # Mã giảm giá
 │   │   ├── payment/                           # Tích hợp PayOS (QR, webhook)
-│   │   ├── cloudinary/                          # Upload ảnh
-│   │   ├── ai/                                    # Trợ lý AI (Gemini)
-│   │   ├── health/                                  # Health check
+│   │   ├── reviews/                             # Đánh giá sản phẩm
+│   │   ├── addresses/                             # Sổ địa chỉ giao hàng
+│   │   ├── cloudinary/                              # Upload ảnh
+│   │   ├── ai/                                        # Trợ lý AI (Gemini)
+│   │   ├── health/                                      # Health check
 │   │   └── common/                                    # Filter, Interceptor,
 │   │                                                     Audit Log dùng chung
 │   └── prisma/

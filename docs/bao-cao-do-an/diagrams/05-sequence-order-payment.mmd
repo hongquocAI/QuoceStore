@@ -1,0 +1,62 @@
+sequenceDiagram
+    autonumber
+    actor KH as Khách hàng
+    participant FE as Frontend
+    participant BE as Backend (Orders/Payment)
+    participant DB as PostgreSQL
+    participant PO as PayOS
+
+    rect rgb(245, 245, 255)
+    note over KH,DB: Bước 1 — Tạo đơn hàng (POST /orders)
+    KH->>FE: Xác nhận đặt hàng (chọn VietQR)
+    FE->>BE: POST /orders { cart, paymentMethod: BANK_TRANSFER, ... }<br/>(KHÔNG gửi giá/tổng tiền)
+    BE->>DB: Đọc lại product/variant thật, validate tồn kho
+    BE->>BE: Tự tính totalAmount = Σ (giá thật × số lượng)<br/>áp dụng discount qua updateMany có điều kiện
+    note right of BE: BANK_TRANSFER: KHÔNG trừ kho ở bước này<br/>(chỉ COD mới trừ kho ngay — Hướng B, chống "hết hàng ảo")
+    BE->>DB: Tạo Order (paymentStatus=PENDING, shippingStatus=PENDING)
+    BE-->>FE: 201 { data: order }
+    end
+
+    rect rgb(255, 250, 235)
+    note over KH,PO: Bước 2 — Tạo link/QR thanh toán
+    FE->>BE: POST /payments/create-qr { orderId }
+    BE->>DB: Đọc lại order.totalAmount (KHÔNG tin số client gửi)
+    BE->>PO: paymentRequests.create({ amount, description, orderCode })
+    PO-->>BE: { qrCode (chuỗi EMVCo), checkoutUrl }
+    BE->>DB: Lưu qrCodeUrl, paymentLink vào Order
+    BE-->>FE: { qrCode, checkoutUrl }
+    FE->>FE: Vẽ QR bằng <QRCodeSVG value={qrCode}> (qrcode.react)
+    FE-->>KH: Hiển thị mã QR VietQR
+    end
+
+    rect rgb(235, 255, 240)
+    note over KH,PO: Bước 3 — Khách thanh toán, PayOS gọi Webhook
+    KH->>PO: Quét QR, chuyển khoản qua app ngân hàng
+    PO->>BE: POST /payments/payos-webhook { data, signature }
+    BE->>BE: payos.webhooks.verify(webhookBody)<br/>(kiểm tra chữ ký HMAC)
+    alt chữ ký không hợp lệ
+        BE-->>PO: 400 Bad Request
+    else orderCode không khớp đơn nào (PayOS test khi confirm webhook)
+        BE-->>PO: 200 OK (log cảnh báo, KHÔNG throw 404)
+    else hợp lệ
+        BE->>DB: Kiểm tra idempotency theo transactionId (đã xử lý chưa?)
+        BE->>BE: So khớp amount thật (DB) với amount trong webhook
+        rect rgb(255, 235, 235)
+        note right of BE: 1 transaction Prisma duy nhất:
+        BE->>DB: Nếu amount khớp: trừ kho (clamp về 0 nếu thiếu,<br/>ghi AuditLog PAYMENT_STOCK_CONFLICT nếu hụt)
+        BE->>DB: Cập nhật Order.paymentStatus = PAID (hoặc FAILED)
+        BE->>DB: Tạo PaymentTransaction (status, webhookPayload)
+        end
+        BE-->>PO: 200 OK
+    end
+    end
+
+    rect rgb(245, 240, 255)
+    note over KH,FE: Bước 4 — Frontend polling phát hiện thanh toán
+    loop mỗi 4 giây, tối đa 10 phút, chỉ khi paymentStatus=PENDING
+        FE->>BE: GET /orders/:id/status (route public, chỉ trả paymentStatus)
+        BE-->>FE: { paymentStatus }
+    end
+    FE->>FE: paymentStatus != PENDING → dừng polling
+    FE-->>KH: Hiển thị "Thanh toán thành công" (PAID)<br/>hoặc thông báo thất bại/hết giờ
+    end

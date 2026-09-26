@@ -155,8 +155,13 @@ export default function CheckoutPage() {
       // ⚡ Gửi kèm variantId cho từng dòng giỏ hàng (đúng fix Cart Module) —
       // server sẽ tự tính lại giá + trừ tồn kho theo đúng biến thể đã chọn,
       // KHÔNG gửi price/totalAmount (server luôn tự tính lại, không tin client).
+      // 🛡️ FIX LỖ HỔNG: đã bỏ gửi `userId` trong body — backend giờ CHỈ lấy
+      // userId từ cookie accessToken (OptionalJwtAuthGuard đọc req.user.id),
+      // không đọc từ body nữa (field `userId` đã bị xóa khỏi CreateOrderDto,
+      // whitelist:true sẽ trả 400 nếu vẫn gửi). Khách đăng nhập: cookie tự
+      // gửi kèm withCredentials, backend tự nhận diện. Khách vãng lai: không
+      // cookie -> backend tự xử lý Guest checkout như cũ.
       const payload = {
-        userId: user?.id, // undefined nếu khách chưa đăng nhập -> backend tự xử lý Guest checkout
         customerName,
         customerPhone,
         customerEmail: customerEmail || undefined,

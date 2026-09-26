@@ -1,0 +1,30 @@
+flowchart LR
+    ROOT["quoce-store/"]
+
+    P["products/"]
+    U["users/"]
+
+    ROOT --> P
+    ROOT --> U
+
+    CAT["&lt;category&gt;/"]
+    SUB["&lt;subCategory&gt;/"]
+    BRAND["&lt;brand&gt;/"]
+    SLUG["&lt;slug sản phẩm&gt;/"]
+    THUMB["thumbnail/<br/>(ảnh đại diện sản phẩm)"]
+    GALLERY["images/<br/>(thư viện ảnh sản phẩm)"]
+    VARIANTS["variants/"]
+    COLOR["&lt;colorCode&gt;/<br/>(ảnh riêng từng màu biến thể)"]
+
+    P --> CAT --> SUB --> BRAND --> SLUG
+    SLUG --> THUMB
+    SLUG --> GALLERY
+    SLUG --> VARIANTS --> COLOR
+
+    UID["&lt;userId&gt;/"]
+    AVATAR["avatars/<br/>(ảnh đại diện người dùng)"]
+    U --> UID --> AVATAR
+
+    RULE["Quy tắc validate folder (Cloudinary Controller):<br/>regex ^quoce-store/(products|users)/[a-zA-Z0-9/_-]+$<br/>Giới hạn: 8MB/file, chỉ jpeg/png/webp<br/>Yêu cầu: JWT + Role ADMIN hoặc VENDOR"]
+
+    ROOT -.-> RULE

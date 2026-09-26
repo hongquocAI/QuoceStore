@@ -1,0 +1,141 @@
+erDiagram
+    User ||--o{ RefreshToken : "co (Cascade)"
+    User ||--o{ Order : "dat (Restrict)"
+    User ||--o{ Review : "viet (Cascade)"
+    User ||--o{ Address : "luu (Cascade)"
+    User ||--o{ AuditLog : "thuc hien (SetNull)"
+
+    Category ||--o{ SubCategory : "co (Restrict)"
+    Category ||--o{ Product : "phan loai (Restrict)"
+    SubCategory ||--o{ Product : "phan loai (Restrict)"
+    Brand ||--o{ Product : "san xuat (Restrict)"
+
+    Product ||--o{ ProductVariant : "co bien the (Cascade)"
+    Product ||--o{ OrderItem : "duoc mua (Restrict)"
+    Product ||--o{ Review : "duoc danh gia (Cascade)"
+    ProductVariant ||--o{ OrderItem : "duoc chon (SetNull)"
+
+    Order ||--o{ OrderItem : "gom (Cascade)"
+    Order ||--o{ PaymentTransaction : "co giao dich (Cascade)"
+
+    User {
+        string id PK
+        string email UK
+        string passwordHash
+        string fullName
+        string phone
+        string cccd
+        int loyaltyPoints
+        enum role "ADMIN|VENDOR|CUSTOMER"
+        boolean isActive
+    }
+    RefreshToken {
+        string id PK
+        string token UK "SHA-256 hash"
+        string userId FK
+        datetime expiresAt
+        boolean revoked
+    }
+    Category {
+        string id PK
+        string name
+        string slug UK
+    }
+    SubCategory {
+        string id PK
+        string name
+        string slug UK
+        string categoryId FK
+    }
+    Brand {
+        string id PK
+        string name
+        string slug UK
+        string logoUrl
+    }
+    Product {
+        string id PK
+        string title
+        string slug UK "bat bien sau khi tao"
+        string sku UK
+        decimal price
+        int stock
+        string[] highlights
+        json specs
+        boolean isActive
+        string categoryId FK
+        string subCategoryId FK
+        string brandId FK
+    }
+    ProductVariant {
+        string id PK
+        string productId FK
+        string colorCode
+        string colorName
+        decimal price "null = dung gia Product"
+        int stock
+        string[] images
+    }
+    Order {
+        string id PK
+        int orderCode UK "autoincrement"
+        string userId FK
+        string customerName
+        string customerPhone
+        string address "snapshot, khong FK"
+        string paymentMethod "COD | BANK_TRANSFER"
+        decimal totalAmount
+        string discountCode "snapshot"
+        decimal discountAmount
+        enum paymentStatus "PENDING|PAID|CANCELLED|FAILED"
+        enum shippingStatus "PENDING|PROCESSING|SHIPPED|DELIVERED|CANCELLED"
+    }
+    OrderItem {
+        string id PK
+        string orderId FK
+        string productId FK
+        string variantId FK "nullable, SetNull"
+        string variantColorName "snapshot"
+        int quantity
+        decimal priceAtPurchase
+    }
+    PaymentTransaction {
+        string id PK
+        string orderId FK
+        string transactionId UK
+        decimal amount
+        string status
+        json webhookPayload
+    }
+    Discount {
+        string id PK
+        string code UK
+        float percentage "0.1 = 10%"
+        int maxUsage
+        int usedCount
+        boolean isActive
+    }
+    Review {
+        string id PK
+        string productId FK
+        string userId FK
+        int rating "1-5"
+        string comment
+    }
+    Address {
+        string id PK
+        string userId FK
+        string recipientName
+        string phone
+        string address
+        boolean isDefault
+    }
+    AuditLog {
+        string id PK
+        string userId FK "nullable"
+        string action
+        string entityType
+        string entityId
+        json metadata "redact password/token/cccd"
+        string ipAddress
+    }
