@@ -14,9 +14,66 @@
 ---
 
 ## 🎯 TRẠNG THÁI HIỆN TẠI
-*(cập nhật lần cuối: 2026-09-05, làm tự động trong lúc người dùng nghỉ)*
+*(cập nhật lần cuối: 2026-09-26, làm tự động theo yêu cầu người dùng)*
 
 ### Đang làm / Việc tiếp theo ngay
+
+**✅ 2 lỗi thật phát hiện qua audit toàn diện phục vụ viết báo cáo đồ án —
+ĐÃ SỬA + TEST + COMMIT RIÊNG BIỆT (2026-09-26).** Audit code thật (đọc lại
+toàn bộ backend/frontend/schema, không chỉ dựa CLAUDE.md/PROGRESS.md) phát
+hiện 4 lỗi doc không ghi. Người dùng đã quyết định qua AskUserQuestion:
+sửa 2 lỗi nghiêm trọng nhất trước, 2 lỗi còn lại ghi vào Known Issues.
+
+1. **[ĐÃ SỬA] Hủy đơn VietQR chưa thanh toán bị cộng sai tồn kho** — commit
+   `17c1df2`. `updateShippingStatus()` cộng lại tồn kho khi CANCELLED cho
+   MỌI đơn, không phân biệt phương thức thanh toán. Từ Hướng B
+   (2026-09-02), đơn `BANK_TRANSFER` KHÔNG trừ kho lúc tạo (chỉ trừ khi
+   webhook xác nhận PAID) — logic hủy không được cập nhật theo, nên hủy 1
+   đơn VietQR đang PENDING (chưa từng bị trừ kho) vẫn được cộng thêm tồn
+   kho, gây tồn kho ảo cộng dồn theo từng đơn bị hủy → có thể dẫn tới bán
+   vượt tồn kho thật. Fix: chỉ hoàn kho khi
+   `paymentMethod !== 'BANK_TRANSFER' || paymentStatus === 'PAID'`. Test
+   bằng script Node (JWT ADMIN tự ký) với backend thật: đơn COD trừ+hoàn
+   đúng, đơn VietQR PENDING không còn bị cộng sai. Đã dọn sạch dữ liệu test.
+2. **[ĐÃ SỬA] `POST /orders` tin `userId` do client tự khai trong body** —
+   commit `9742c40`. Route public (cho phép guest checkout), nhưng
+   `CreateOrderDto.userId` đọc thẳng từ body, server chỉ check user đó có
+   tồn tại, KHÔNG check người gửi có phải chính user đó không. `GET
+   /reviews` (public) trả kèm `user.id` của người đánh giá → kẻ tấn công
+   lấy được userId thật của nạn nhân từ đó, tự khai vào `POST /orders` để
+   chèn đơn hàng giả vào lịch sử `/orders` của nạn nhân (không lộ dữ liệu,
+   không ảnh hưởng loyalty/discount — 2 field này không được code nào
+   dùng). Fix: `OptionalJwtAuthGuard` mới
+   (`backend/src/auth/guards/optional-jwt-auth.guard.ts`) — không có cookie
+   `accessToken` → cho qua (giữ guest checkout), CÓ cookie → verify chữ ký
+   bắt buộc như `JwtAuthGuard` (cookie sai/hết hạn vẫn 401). `userId` giờ
+   CHỈ lấy từ `req.user.id` đã verify, xóa hẳn field `userId` khỏi
+   `CreateOrderDto` (whitelist:true tự 400 nếu client vẫn gửi). Frontend
+   `checkout/page.tsx` bỏ gửi `userId` trong payload. Test bằng script Node
+   (JWT tự ký bằng `JWT_SECRET` thật) — 4 ca: body có `userId` (không
+   cookie) → 400; cookie hợp lệ → đơn gán đúng userId từ token; không cookie
+   → guest checkout vẫn hoạt động; cookie rác/giả → 401. `tsc --noEmit`
+   sạch cả 2 phía. Đã dọn sạch đơn test.
+
+⚠️ **Push lên GitHub bị từ chối** (2026-09-26): remote báo repo đã chuyển
+sang `https://github.com/hongquocAI/QuoceStore.git` và nhánh `main` hiện có
+rule bắt buộc Pull Request (`GH013: Repository rule violations`). 2 commit
+trên (`17c1df2`, `9742c40`) hiện CHỈ có local, CHƯA lên remote. Đây là thay
+đổi hạ tầng ngoài phạm vi agent tự quyết định (đổi remote/tạo PR) — người
+dùng cần tự xác nhận remote mới đúng ý muốn rồi `git remote set-url` +
+push (hoặc mở PR) khi rảnh.
+
+**⚠️ Ghi nhận qua audit, CHƯA sửa (theo đúng quyết định người dùng — xem
+Known Issues bên dưới để biết đầy đủ)**: Sentry không nhận được lỗi nào
+(`GlobalExceptionFilter` không gọi `captureException`), race condition tồn
+kho khi 2 đơn COD đặt cùng lúc (read-then-write giá trị tuyệt đối, không
+phải `updateMany` có điều kiện như Discount).
+
+**Đang làm tiếp**: viết báo cáo đồ án hoàn chỉnh (.docx, có sơ đồ Mermaid
+render PNG thật + ảnh chụp giao diện thật) tại `docs/bao-cao-do-an/` — xem
+chi tiết kế hoạch trong entry Nhật ký chi tiết tương ứng.
+
+### (Lịch sử — Sổ địa chỉ nhiều địa chỉ, 2026-09-05)
 
 **✅ Sổ địa chỉ nhiều địa chỉ (mục treo CUỐI CÙNG của Nhóm G) — BACKEND +
 FRONTEND ĐÃ XONG (2026-09-05), CHỜ NGƯỜI DÙNG TEST UI BẰNG MẮT (chưa test).**
@@ -682,6 +739,43 @@ phát hiện ra nhưng CHƯA kịp sửa, để không bị quên giữa các ph
   thành JSON ở tầng submit, không đổi format lưu DB). Cần thiết kế riêng
   (UI cho việc thêm/xóa/sắp xếp hàng, xử lý giá trị lồng nhau nếu có) —
   không thuộc phạm vi đợt sửa UX vừa xong.
+- **[MỚI 2026-09-26, phát hiện qua audit toàn diện, người dùng quyết định
+  KHÔNG sửa đợt này]** `GlobalExceptionFilter` (`common/filters/`) KHÔNG
+  gọi `Sentry.captureException()` — `main.ts` chỉ `Sentry.init()`, không có
+  file nào khác import `@sentry/node`. Lỗi 500 thật hiện KHÔNG được báo về
+  Sentry dù DSN đã cấu hình. CLAUDE.md trước đây ghi sai là đã nối — đã sửa
+  lại CLAUDE.md khớp thực tế.
+- **[MỚI 2026-09-26]** Race condition tồn kho cho đơn COD: `create()` trừ
+  kho bằng đọc giá trị rồi ghi đè số tuyệt đối
+  (`stock: variant.stock - quantity`), KHÔNG dùng `updateMany` có điều kiện
+  như cách Discount đang chống race (`usedCount: { lt: maxUsage }`). 2 đơn
+  COD đặt cùng lúc cho cùng 1 variant có thể ghi đè nhau (lost update), dẫn
+  tới trừ kho sai. Cách sửa gợi ý: `updateMany({ where: { id, stock: { gte:
+  quantity } }, data: { stock: { decrement: quantity } } })`, nếu
+  `count === 0` thì throw hết hàng — mirror đúng pattern Discount.
+- **[MỚI 2026-09-26]** 2 ca biên liên quan tới lỗi restock đã sửa (không tự
+  sửa đợt này vì nằm ngoài phạm vi Lỗi 2 đã chốt): (a) Admin hủy 1 đơn
+  VietQR đang PENDING, sau đó khách vẫn quét QR cũ và trả tiền thật —
+  webhook chỉ xét `paymentStatus !== PAID` khi quyết định trừ kho, không
+  xét `shippingStatus`, nên vẫn đánh dấu PAID + trừ kho cho 1 đơn đã bị hủy.
+  (b) `order.paymentStatus` trong webhook được ghi bằng `update` thường
+  (không điều kiện) — 1 webhook FAILED tới sau 1 webhook PAID (dữ liệu trễ/
+  gọi lại từ PayOS) có thể ghi đè PAID thành FAILED.
+- **[MỚI 2026-09-26]** Refresh token rotation không có cơ chế phát hiện tái
+  sử dụng (reuse detection): token cũ bị revoke khi refresh, nhưng nếu 1
+  token đã revoke bị dùng lại (dấu hiệu token bị đánh cắp), hệ thống chỉ từ
+  chối request đó, KHÔNG revoke toàn bộ token còn lại của user như thực
+  hành bảo mật chuẩn khuyến nghị.
+- **[MỚI 2026-09-26]** `LookupOrderDto.customerPhone` chỉ chấp nhận
+  `/^0\d{9}$/`, trong khi `CreateOrderDto.customerPhone` chấp nhận cả định
+  dạng `84xxxxxxxxx`. Một đơn đặt với số bắt đầu `84` sẽ không tra cứu được
+  qua `/orders/lookup`.
+- **[MỚI 2026-09-26]** Repo GitHub đã chuyển sang
+  `https://github.com/hongquocAI/QuoceStore.git` (remote cũ báo "repository
+  moved"), nhánh `main` hiện có rule bắt buộc Pull Request. `git push` trực
+  tiếp bị từ chối (`GH013`). Cần người dùng tự xác nhận remote mới rồi cập
+  nhật `git remote set-url origin ...` + push, hoặc chuyển hẳn sang quy
+  trình PR.
 
 ### 🔍 Cần người dùng kiểm tra (chưa tự verify được trong phiên này)
 
@@ -2369,3 +2463,72 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
     NGƯỜI DÙNG TỰ TEST UI BẰNG MẮT" ở phần Trạng thái hiện tại đầu file.
   - Không phát sinh quyết định kiến trúc lớn nào cần dừng lại hỏi — toàn bộ
     nằm trong phạm vi "CRUD đơn giản mirror pattern có sẵn" như đã giao.
+
+### [2026-09-26] Đã hoàn thành: Audit toàn diện + sửa 2 lỗi thật + bắt đầu viết báo cáo đồ án (.docx)
+
+- **Bối cảnh**: người dùng yêu cầu rà soát toàn bộ project để viết báo cáo
+  đồ án hoàn chỉnh (.docx, có sơ đồ Mermaid render PNG thật, ảnh chụp giao
+  diện thật), với nguyên tắc trung thực tuyệt đối — dựa đúng code thật, ghi
+  rõ hạn chế, không bịa tính năng. Vào Plan Mode trước, dùng 3 agent Explore
+  song song (backend, frontend, docs/schema) đọc lại toàn bộ code thật
+  (không chỉ tin CLAUDE.md/PROGRESS.md).
+- **Sai lệch doc ↔ code thật đã xác nhận và sửa lại** (nguyên tắc #10):
+  - CLAUDE.md ghi AuditLog "chưa từng ghi gì" — SAI, thực tế
+    `AuditLogInterceptor` đã ghi toàn cục từ 2026-08-30, có 21 `@Audit`
+    decorator + 1 ghi trực tiếp `PAYMENT_STOCK_CONFLICT` trong
+    `payment.service.ts`. Đã sửa CLAUDE.md.
+  - CLAUDE.md ngụ ý Sentry đã nối vào GlobalExceptionFilter — SAI, chỉ có
+    `Sentry.init()` trong `main.ts`, không có `captureException()` nào. Đã
+    sửa CLAUDE.md + ghi vào Known Issues.
+  - "Category Admin CRUD" (nhắc trong CLAUDE.md mục Đợt 4) thực tế = API
+    `POST/DELETE /categories` + quick-add trong form sản phẩm Admin, KHÔNG
+    có trang `/admin/categories` riêng. Đã làm rõ trong CLAUDE.md.
+  - README.md thiếu 2 module `reviews/`, `addresses/` trong cây thư mục
+    `backend/src/`. Đã bổ sung.
+- **4 lỗi thật phát hiện qua audit, người dùng quyết định qua
+  AskUserQuestion (sau khi tôi giải thích rõ mức khai thác thực tế của 2
+  lỗi nghiêm trọng nhất bằng cách đọc trực tiếp code, không suy đoán từ tóm
+  tắt của agent)**:
+  1. Hủy đơn VietQR chưa thanh toán bị cộng sai tồn kho — **ĐÃ SỬA**, xem
+     chi tiết ở "🎯 TRẠNG THÁI HIỆN TẠI". Commit `17c1df2`.
+  2. `POST /orders` tin `userId` từ body client — **ĐÃ SỬA**, xem chi tiết ở
+     "🎯 TRẠNG THÁI HIỆN TẠI". Commit `9742c40`.
+  3. Sentry không nhận lỗi 500 — ghi Known Issues, không sửa đợt này.
+  4. Race condition tồn kho đơn COD — ghi Known Issues, không sửa đợt này.
+  - Người dùng yêu cầu 2 commit TÁCH RIÊNG (không gộp Lỗi 1 + Lỗi 2 + báo
+    cáo) để có thể revert độc lập nếu cần rà soát lại sau.
+  - Người dùng ban đầu muốn dừng lại duyệt diff Lỗi 1 trước khi commit
+    (đúng theo Plan đã trình), nhưng sau đó chủ động chuyển toàn bộ phần
+    còn lại của Plan sang chế độ tự động (không cần dừng hỏi nữa), CHỈ giữ
+    lại yêu cầu bắt buộc "commit riêng biệt cho Lỗi 1".
+- **File đã sửa (Lỗi 2)**: `backend/src/orders/orders.service.ts`
+  (`updateShippingStatus()`).
+- **File đã sửa (Lỗi 1)**: `backend/src/auth/guards/optional-jwt-auth.guard.ts`
+  (mới), `backend/src/orders/orders.controller.ts`,
+  `backend/src/orders/orders.service.ts` (`create()`),
+  `backend/src/orders/dto/create-order.dto.ts`,
+  `frontend/src/app/checkout/page.tsx`.
+- **Đã test**: `npx tsc --noEmit` sạch cả 2 phía cho cả 2 lỗi. Script Node
+  test API thật với backend dev đang chạy thật (JWT tự ký bằng
+  `JWT_SECRET` thật đọc từ `.env`, KHÔNG in ra giá trị, field `sub` — đúng
+  bài học đã ghi trước đây). Lỗi 2: 4 ca (COD tạo/hủy đúng, VietQR PENDING
+  tạo/hủy không còn cộng sai). Lỗi 1: 4 ca (userId trong body → 400; cookie
+  hợp lệ → đúng userId; không cookie → guest; cookie giả → 401). Đã dọn
+  sạch toàn bộ đơn hàng test sau mỗi lần chạy, xác nhận lại tồn kho bằng
+  query trực tiếp DB.
+- **Lưu ý/vấn đề gặp phải**:
+  - Backend dev server lần khởi động đầu tiên bị crash do Neon (serverless,
+    "ngủ" khi không hoạt động) chưa kịp thức dậy ở lần kết nối đầu —
+    `PrismaClientInitializationError` làm unhandled rejection giết cả tiến
+    trình Node. Khởi động lại lần 2 (đợi lâu hơn) thành công. Không phải
+    bug code, là đặc tính Neon serverless đã biết trước.
+  - `git push` bị từ chối: repo đã chuyển sang
+    `hongquocAI/QuoceStore.git`, nhánh `main` hiện bắt buộc Pull Request
+    (`GH013`). 2 commit trên hiện CHỈ có local. Đã ghi rõ vào Known Issues,
+    KHÔNG tự ý đổi remote hay tạo PR (thay đổi hạ tầng ngoài phạm vi agent
+    tự quyết).
+  - Báo cáo đồ án (.docx) đang được viết tiếp trong `docs/bao-cao-do-an/`
+    theo plan đã duyệt — xem file plan
+    `C:\Users\QUOC\.claude\plans\cozy-bubbling-music.md` nếu cần đối chiếu
+    phạm vi đầy đủ (8 sơ đồ Mermaid, ảnh chụp giao diện tự động qua
+    puppeteer-core + Chrome có sẵn, nội dung 6 chương theo chuẩn đồ án VN).
