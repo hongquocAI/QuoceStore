@@ -1,0 +1,14 @@
+{
+  "name": "quocestore-report-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cong cu noi bo de tao bao cao do an QuoceStore (.docx) - KHONG phai code san pham",
+  "type": "commonjs",
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^12.0.0",
+    "docx": "^9.7.2",
+    "dotenv": "^18.0.4",
+    "jsonwebtoken": "^9.0.3",
+    "puppeteer-core": "^25.12.0"
+  }
+}

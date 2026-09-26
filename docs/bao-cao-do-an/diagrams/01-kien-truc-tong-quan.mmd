@@ -1,0 +1,36 @@
+flowchart TB
+    FE["<b>Next.js 16 (App Router)</b><br/>React 19 - Client Components<br/>axios (withCredentials: true)"]
+
+    subgraph BE["MÁY CHỦ BACKEND - NestJS 11"]
+        direction TB
+        MW["helmet · cookie-parser · CORS<br/>ThrottlerGuard (100 req / 60s)<br/>ValidationPipe (whitelist, forbidNonWhitelisted)"]
+        API["Controller → Guard (JWT / Roles) → Service"]
+        AUDIT["AuditLogInterceptor<br/>(toàn cục, ghi theo @Audit)"]
+        FILTER["GlobalExceptionFilter<br/>(chuẩn hóa lỗi trả về)"]
+        MW --> API --> AUDIT --> FILTER
+    end
+
+    subgraph DATA["TẦNG DỮ LIỆU"]
+        direction LR
+        REDIS[("Redis - Upstash<br/>(cache danh mục/thương hiệu)")]
+        PG[("PostgreSQL - Neon<br/>qua Prisma ORM 6")]
+    end
+
+    subgraph EXT["DỊCH VỤ BÊN THỨ 3"]
+        direction LR
+        CLOUD["Cloudinary<br/>(ảnh sản phẩm/avatar)"]
+        PAYOS["PayOS v2<br/>(QR + webhook)"]
+        GOOGLE["Google OAuth2<br/>(verifyIdToken)"]
+        GEMINI["Gemini<br/>(@google/genai)"]
+    end
+
+    SENTRY["Sentry<br/>(chỉ Sentry.init - CHƯA nối captureException)"]
+
+    FE -->|"HTTPS + Cookie HttpOnly<br/>accessToken / refreshToken"| MW
+    API --> PG
+    API --> REDIS
+    API --> CLOUD
+    API <-->|"tạo QR / xác nhận thanh toán"| PAYOS
+    API --> GOOGLE
+    API --> GEMINI
+    BE -.-> SENTRY

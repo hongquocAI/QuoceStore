@@ -1,0 +1,48 @@
+sequenceDiagram
+    autonumber
+    actor U as Người dùng
+    participant FE as Frontend (Next.js)
+    participant BE as Backend (NestJS)
+    participant G as Google OAuth2
+    participant DB as PostgreSQL
+
+    rect rgb(245, 245, 255)
+    note over U,DB: Nhánh A — Đăng ký / Đăng nhập bằng Email
+    U->>FE: Nhập email + mật khẩu
+    FE->>BE: POST /auth/login
+    BE->>DB: Tìm user theo email
+    BE->>BE: bcrypt.compare(password, passwordHash)
+    BE->>BE: issueTokenPair(): ký accessToken (15p)<br/>+ tạo refreshToken (random 48 byte)
+    BE->>DB: Lưu SHA-256(refreshToken) vào RefreshToken
+    BE-->>FE: Set-Cookie accessToken (path=/, 15p)<br/>Set-Cookie refreshToken (path=/auth, 30 ngày)
+    end
+
+    rect rgb(255, 250, 235)
+    note over U,DB: Nhánh B — Đăng nhập bằng Google
+    U->>FE: Bấm nút "Đăng nhập với Google"
+    FE->>G: OAuth popup (@react-oauth/google)
+    G-->>FE: credential (ID token JWT)
+    FE->>BE: POST /auth/google { token }
+    BE->>G: OAuth2Client.verifyIdToken(token, audience)
+    G-->>BE: payload đã xác minh (email, email_verified, name)
+    alt email_verified = false
+        BE-->>FE: 401 Unauthorized
+    else hợp lệ
+        BE->>DB: Tìm hoặc tạo user theo email<br/>(mật khẩu ngẫu nhiên bcrypt nếu user mới)
+        BE-->>FE: Set-Cookie accessToken + refreshToken (như trên)
+    end
+    end
+
+    rect rgb(235, 255, 240)
+    note over U,DB: Nhánh C — Request kèm accessToken hết hạn (giữa phiên)
+    FE->>BE: GET /orders/my-orders (Cookie: accessToken hết hạn)
+    BE-->>FE: 401 Unauthorized
+    FE->>FE: axios interceptor bắt 401 (URL không nằm trong SILENT_401_URLS)
+    FE->>BE: POST /auth/refresh (Cookie: refreshToken)
+    BE->>DB: Tìm RefreshToken theo SHA-256(token)<br/>kiểm tra revoked=false, expiresAt, user.isActive
+    BE->>DB: Đánh dấu revoked=true token cũ
+    BE->>DB: Tạo cặp token mới (rotation)
+    BE-->>FE: Set-Cookie accessToken + refreshToken mới
+    FE->>BE: Gọi lại GET /orders/my-orders (request gốc)
+    BE-->>FE: 200 OK
+    end

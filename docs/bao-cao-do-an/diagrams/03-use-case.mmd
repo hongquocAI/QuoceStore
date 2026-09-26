@@ -1,0 +1,37 @@
+flowchart LR
+    Guest(["Khách vãng lai"])
+    Customer(["Khách hàng<br/>(đã đăng nhập)"])
+    Admin(["Quản trị viên<br/>ADMIN"])
+    Vendor(["Đối tác bán hàng<br/>VENDOR"])
+
+    subgraph UC_GUEST["Chức năng công khai"]
+        direction TB
+        uc1(("Duyệt / tìm kiếm<br/>sản phẩm"))
+        uc2(("Xem chi tiết &<br/>đánh giá sản phẩm"))
+        uc3(("Giỏ hàng &<br/>đặt hàng (COD/VietQR)"))
+        uc5(("Tra cứu đơn<br/>bằng SĐT"))
+        uc6(("Đăng ký / Đăng nhập<br/>(Email hoặc Google)"))
+    end
+
+    subgraph UC_CUSTOMER["Chức năng tài khoản"]
+        direction TB
+        uc7(("Xem lịch sử<br/>đơn hàng"))
+        uc8(("Đánh giá sản phẩm<br/>đã mua (DELIVERED)"))
+        uc9(("Hồ sơ, đổi mật khẩu,<br/>sổ địa chỉ"))
+    end
+
+    subgraph UC_ADMIN["Chức năng quản trị"]
+        direction TB
+        uc11(("Quản lý sản phẩm,<br/>danh mục, thương hiệu"))
+        uc13(("Quản lý đơn hàng<br/>(state machine)"))
+        uc14(("Xem cảnh báo<br/>tồn kho thấp"))
+    end
+
+    uc15(("Upload ảnh<br/>lên Cloudinary"))
+
+    Guest --> UC_GUEST
+    Customer -.->|"kế thừa toàn bộ"| Guest
+    Customer --> UC_CUSTOMER
+    Admin --> UC_ADMIN
+    Admin --> uc15
+    Vendor -->|"chỉ quyền upload"| uc15

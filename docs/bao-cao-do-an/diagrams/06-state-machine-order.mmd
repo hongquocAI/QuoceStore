@@ -1,0 +1,37 @@
+stateDiagram-v2
+    [*] --> PENDING : Tạo đơn hàng thành công
+
+    PENDING --> PROCESSING : Admin xác nhận đơn
+    PENDING --> CANCELLED : Admin huỷ đơn
+
+    PROCESSING --> SHIPPED : Admin bàn giao vận chuyển
+    PROCESSING --> CANCELLED : Admin huỷ đơn
+
+    SHIPPED --> DELIVERED : Xác nhận đã giao
+
+    DELIVERED --> [*]
+    CANCELLED --> [*]
+
+    note right of CANCELLED
+        Hoàn kho CHỈ khi kho đã thực
+        sự bị trừ trước đó:
+        paymentMethod != BANK_TRANSFER
+        HOẶC paymentStatus == PAID
+        (fix 2026-09-26 — trước đó hoàn
+        kho vô điều kiện, gây tồn kho ảo
+        cho đơn VietQR chưa thanh toán)
+    end note
+
+    note right of SHIPPED
+        SHIPPED chỉ có thể tiến tới
+        DELIVERED — không huỷ ngang
+        được nữa (hàng đang trên đường)
+    end note
+
+    note left of DELIVERED
+        Trạng thái CUỐI — không có
+        route hoàn tiền tự động qua
+        PayOS. Đơn PAID bị huỷ cần
+        Admin hoàn tiền thủ công qua
+        PayOS Dashboard.
+    end note

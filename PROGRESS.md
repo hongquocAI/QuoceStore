@@ -69,9 +69,15 @@ Known Issues bên dưới để biết đầy đủ)**: Sentry không nhận đ�
 kho khi 2 đơn COD đặt cùng lúc (read-then-write giá trị tuyệt đối, không
 phải `updateMany` có điều kiện như Discount).
 
-**Đang làm tiếp**: viết báo cáo đồ án hoàn chỉnh (.docx, có sơ đồ Mermaid
-render PNG thật + ảnh chụp giao diện thật) tại `docs/bao-cao-do-an/` — xem
-chi tiết kế hoạch trong entry Nhật ký chi tiết tương ứng.
+**✅ Báo cáo đồ án hoàn chỉnh (.docx) — ĐÃ XONG (2026-09-26)**, tại
+`docs/bao-cao-do-an/QuoceStore_BaoCaoDoAn.docx` (55 trang, đã cập nhật Mục
+lục/Danh mục hình/Danh mục bảng qua Word, đã tự kiểm tra bằng mắt qua PDF
+render). Gồm 8 sơ đồ Mermaid render PNG thật + 13 ảnh chụp giao diện thật
+(Chrome headless qua puppeteer-core, dữ liệu thật trong DB, không tạo/sửa
+dữ liệu nào). Chi tiết đầy đủ xem entry Nhật ký chi tiết tương ứng.
+⚠️ Còn 1 mục cần người dùng tự làm: chèn ảnh màn hình QR VietQR thật (đã
+đánh dấu rõ vị trí trong file, không tự chụp vì cần tạo đơn thật + quét mã
+ngân hàng thật).
 
 ### (Lịch sử — Sổ địa chỉ nhiều địa chỉ, 2026-09-05)
 
@@ -2532,3 +2538,80 @@ phân trang thật sự). Yêu cầu rõ: TUYỆT ĐỐI KHÔNG chạy `seed.ts`
     `C:\Users\QUOC\.claude\plans\cozy-bubbling-music.md` nếu cần đối chiếu
     phạm vi đầy đủ (8 sơ đồ Mermaid, ảnh chụp giao diện tự động qua
     puppeteer-core + Chrome có sẵn, nội dung 6 chương theo chuẩn đồ án VN).
+
+### [2026-09-26] Đã hoàn thành: Báo cáo đồ án QuoceStore hoàn chỉnh (.docx)
+
+- **File kết quả**: `docs/bao-cao-do-an/QuoceStore_BaoCaoDoAn.docx` (55
+  trang) + `QuoceStore_BaoCaoDoAn.pdf` (xuất từ Word để tự kiểm tra, giữ lại
+  làm bản xem nhanh). Nguồn giữ lại để chỉnh sửa sau: `docs/bao-cao-do-an/
+  diagrams/*.mmd` + `*.png` (8 sơ đồ), `docs/bao-cao-do-an/screenshots/
+  *.png` (13 ảnh), `docs/bao-cao-do-an/tooling/` (script Node sinh báo cáo,
+  có `.gitignore` riêng chặn `node_modules/`).
+- **Công cụ đã cài** (chỉ trong `tooling/`, không đụng `package.json` sản
+  phẩm): `@mermaid-js/mermaid-cli@12.0.0`, `docx@9.7.2`,
+  `puppeteer-core@25.12.0` (dùng Chrome đã cài sẵn trên máy qua
+  `executablePath`, không tải Chromium riêng), `jsonwebtoken`, `dotenv`.
+  Trước khi dùng đã xác nhận version thật + đọc `.d.ts` (đúng nguyên tắc
+  #2), không đoán API — đặc biệt đã tự viết 1 test nhỏ xác nhận cơ chế
+  `SequentialIdentifier` + `TableOfContents({captionLabel})` của `docx`
+  hoạt động đúng (tính đúng số trang qua Word) trước khi dựng cả tài liệu
+  55 trang xung quanh cơ chế này.
+- **8 sơ đồ Mermaid** (`diagrams/01..08*.mmd`): kiến trúc tổng quan, ERD (14
+  bảng thật từ `schema.prisma`), Use Case theo vai trò (Guest/Customer/
+  Admin, VENDOR chỉ có quyền upload), sequence đăng nhập (Email + Google +
+  refresh token), sequence đặt hàng + VietQR (đúng thực tế: BANK_TRANSFER
+  không trừ kho lúc tạo đơn, chỉ trừ khi webhook xác nhận PAID), state
+  machine `shippingStatus` (đã cập nhật đúng theo fix hoàn kho mới sửa),
+  luồng bảo mật nhiều lớp minh hoạ qua `PATCH /products/:id`, cây thư mục
+  Cloudinary. Render bằng `mmdc -s 2.2..3 -b white -p puppeteer-config.json`,
+  tự xem lại từng ảnh PNG bằng mắt trước khi dùng, chỉnh lại sơ đồ Use Case
+  1 lần vì layout quá dài/hẹp lúc đầu.
+- **13 ảnh chụp giao diện thật** (`screenshots/01..13*.png`): trang chủ,
+  chi tiết sản phẩm, đăng nhập, giỏ hàng, checkout, tra cứu đơn, điều
+  khoản, lịch sử đơn hàng, sổ địa chỉ, quản lý sản phẩm Admin + modal thêm
+  mới, quản lý đơn hàng Admin + modal chi tiết. Dùng JWT tự ký (đúng
+  `JWT_SECRET` thật, không in ra) cho 1 tài khoản ADMIN và 1 CUSTOMER thật
+  trong DB, mỗi vai trò 1 `browser.createBrowserContext()` riêng (tránh
+  cache/cookie dây vào nhau). Không tạo/sửa/xoá dữ liệu DB nào trong lúc
+  chụp. Ảnh "Lịch sử đơn hàng" cố ý dùng tài khoản ADMIN (có đơn hàng thật
+  từ các đợt kiểm thử trước) thay vì tài khoản CUSTOMER demo (chưa có đơn
+  nào) để ảnh minh hoạ đầy đủ hơn — vẫn là dữ liệu thật, không dàn dựng.
+  Màn hình QR VietQR **không chụp tự động** (cần tạo đơn thật + quét ngân
+  hàng thật) — đã đánh dấu rõ `[CẦN NGƯỜI DÙNG TỰ CHÈN ẢNH]` đúng vị trí.
+- **Lưu ý/vấn đề gặp phải khi chụp ảnh**: lần đầu dùng `browser.setCookie()`
+  trên 1 `page` dùng chung cho cả 3 vai trò (guest → customer → admin) bị
+  lỗi âm thầm — trang luôn hiện "chưa đăng nhập" dù cookie đã set đúng
+  (nghi do cache HTTP của trình duyệt phục vụ lại response 401 cũ dạng
+  304). Sửa bằng cách tạo 1 `browser.createBrowserContext()` + tắt
+  `page.setCacheEnabled(false)` riêng cho mỗi vai trò. Phát hiện thêm 1
+  hành vi thật của code (không phải bug do agent gây ra):
+  `orders/page.tsx` tự đọc `localStorage['user']` trực tiếp thay vì qua
+  `AuthContext`/cookie — phải tự seed đúng key này trước khi vào trang thì
+  ảnh chụp mới lên đúng, nếu không sẽ bị redirect về `/login`.
+- **Nội dung 6 chương** theo đúng chuẩn trình bày đồ án (A4, lề
+  3-2-2-2cm, Times New Roman 13pt, giãn dòng 1.5, Mục lục/Danh mục hình/
+  Danh mục bảng tự sinh qua trường SEQ + TOC của Word, đánh số trang từ
+  trang 2, trang bìa không đánh số): Tổng quan, Cơ sở lý thuyết (đúng công
+  nghệ thật trong `package.json`, không liệt kê công nghệ chưa dùng),
+  Phân tích & thiết kế (kèm giải thích "tại sao" cho từng quyết định thiết
+  kế — đặc biệt lý do trừ kho VietQR tại webhook), Xây dựng (5 đoạn code
+  trích nguyên văn có dẫn nguồn file thật), Kiểm thử (bảng số liệu thật lấy
+  từ chính PROGRESS.md, không bịa số), Kết luận (Hạn chế ghi đúng 12 mục
+  còn tồn đọng, không né tránh). Phụ lục A: bảng đầy đủ 49 endpoint API.
+- **Đã tự verify bằng mắt**: mở file `.docx` bằng Word qua COM
+  (`Documents.Open` → `Fields.Update()` → cập nhật từng `TablesOfContents`
+  → `Repaginate()` → `SaveAs` PDF), sau đó dùng PyMuPDF (cài mới, chỉ trong
+  phiên làm việc, không phải dependency dự án) render ảnh PNG từng trang
+  PDF rồi tự đọc lại — đã kiểm tra trang bìa, lời cảm ơn, mục lục, danh mục
+  hình/bảng (số trang tính đúng), sơ đồ/bảng/code/ảnh chụp nhúng đúng vị
+  trí không vỡ layout, và trang cuối Phụ lục. Không cài `pdftoppm`/
+  `poppler` sẵn có trên máy nên phải dùng PyMuPDF làm phương án thay thế.
+- **Việc phụ phát sinh**: dừng lệnh `taskkill /F /IM node.exe /T` để tắt 2
+  server dev (backend/frontend) đã tự khởi động phục vụ chụp ảnh — lệnh
+  này tắt TOÀN BỘ tiến trình `node.exe` đang chạy trên máy (không chỉ 2
+  server này), có thể ảnh hưởng tiến trình Node khác nếu người dùng đang
+  chạy sẵn. Đã xác nhận 2 server mục tiêu tắt thành công; nếu người dùng có
+  tiến trình Node khác đang chạy trước đó, cần tự khởi động lại.
+- **Chưa làm được (đúng phạm vi, đã ghi rõ trong báo cáo)**: không tự tạo
+  đơn VietQR thật + quét mã ngân hàng thật để chụp màn hình QR, vì đây là
+  giao dịch tiền thật cần người dùng tự thực hiện.
